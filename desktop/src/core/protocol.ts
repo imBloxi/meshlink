@@ -196,6 +196,8 @@ export type NodeEvent =
   | {
       kind: "info"; version: number; chipId: number; mac: string; channel: number; fwVersion?: string;
       role?: Role; perm?: Perm; netId?: number; nodeName?: string;
+      /** Chip name (firmware 0.5.0+), for example "ESP8266" or "ESP32-C3". Absent on older nodes. */
+      chip?: string;
     }
   | { kind: "recv"; airType: number; ttl: number; origin: number; msgId: number; flags: number; body: Uint8Array }
   | { kind: "sent"; msgId: number }
@@ -243,6 +245,9 @@ export function parseHostFrame(frame: Uint8Array): NodeEvent | null {
         info.netId = dv.getUint32(i + 2, true);
         const n = p[i + 6];
         info.nodeName = dec.decode(p.subarray(i + 7, i + 7 + n));
+        i += 7 + n;
+        // Firmware 0.5.0+: chip name. Older nodes end the frame here.
+        if (p.length > i && p.length >= i + 1 + p[i]) info.chip = dec.decode(p.subarray(i + 1, i + 1 + p[i]));
       }
       return info;
     }

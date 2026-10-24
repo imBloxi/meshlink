@@ -9,7 +9,7 @@ import {
 import { VERSION } from "@core/protocol";
 import type { AppInfo, UpdateInfo } from "@shared/api";
 import { useEffect, useId, useState, type ReactNode } from "react";
-import { isOlder } from "../lib/flasher";
+import { assessFirmware, wantsUpdate } from "@core/firmware";
 import { api } from "../lib/platform";
 import { useApp, type Accent } from "../lib/store";
 
@@ -211,7 +211,10 @@ function UsbSection() {
 function NetworkTab() {
   const { settings: s, updateSetting, conn, neighbors, firmware, setPanel } = useApp();
   const bundled = firmware?.manifest.version;
-  const outdated = conn.status === "connected" && conn.kind === "usb" && !!bundled && isOlder(conn.fwVersion, bundled);
+  const fw = conn.status === "connected" && conn.kind === "usb"
+    ? assessFirmware({ nodeFw: conn.fwVersion, nodeProtocol: conn.protocol ?? VERSION, nodeChip: conn.chip, appProtocol: VERSION, bundled: firmware?.manifest })
+    : null;
+  const outdated = !!fw && wantsUpdate(fw);
   return (
     <>
       <Section title="Presence">
@@ -231,6 +234,8 @@ function NetworkTab() {
           <dt className="text-muted">Node id</dt><dd className="font-mono text-[13px]">{conn.chipId?.toString(16).toUpperCase() ?? "—"}</dd>
           <dt className="text-muted">Firmware</dt>
           <dd>{conn.status === "connected" ? (conn.fwVersion ? `v${conn.fwVersion}` : "v0.1 (no version info)") : "—"}</dd>
+          <dt className="text-muted">Chip</dt>
+          <dd>{conn.status === "connected" ? (conn.chip ?? (fw?.chip && fw.chip !== "unknown" ? `${fw.chip} (assumed)` : "unknown")) : "—"}</dd>
           <dt className="text-muted">MAC</dt><dd className="font-mono text-[13px]">{conn.mac ?? "—"}</dd>
           <dt className="text-muted">Nodes in range</dt>
           <dd className="font-mono text-[13px]">
@@ -242,8 +247,8 @@ function NetworkTab() {
       <Section title="Node firmware">
         <Row
           title={bundled ? `Bundled firmware v${bundled}` : "No firmware bundled"}
-          text={outdated
-            ? "Your node runs older firmware. Flash it to get the latest fixes."
+          text={fw && fw.state !== "current"
+            ? fw.message
             : "Install MeshLink on a new ESP8266, or update an existing node."}
         >
           <Button
@@ -417,7 +422,7 @@ function Versions() {
         <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-sm py-3">
           <dt className="text-muted">App</dt><dd className="font-mono text-[13px]">v{info?.version ?? __APP_VERSION__}</dd>
           <dt className="text-muted">Bundled firmware</dt><dd className="font-mono text-[13px]">{firmware ? `v${firmware.manifest.version}` : "—"}</dd>
-          <dt className="text-muted">Node firmware</dt><dd className="font-mono text-[13px]">{nodeFw}</dd>
+          <dt className="text-muted">Node firmware</dt><dd className="font-mono text-[13px]">{nodeFw}{conn.status === "connected" && conn.chip ? ` · ${conn.chip}` : ""}</dd>
           <dt className="text-muted">Protocol</dt><dd className="font-mono text-[13px]">v{VERSION}</dd>
           {info?.electron && (<><dt className="text-muted">Electron</dt><dd className="font-mono text-[13px]">{info.electron} · Chromium {info.chrome}</dd></>)}
           <dt className="text-muted">Platform</dt><dd className="font-mono text-[13px]">{info?.platform ?? "—"}</dd>

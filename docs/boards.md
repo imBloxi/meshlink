@@ -87,8 +87,11 @@ tries to bring the screen back every 5 seconds.
 
 ## Status of testing
 
-Built and checked so far: `d1_mini`, `nodemcuv2`, `d1_mini_sh1106` and `esp32dev`
-compile. The OLED was found and initialised on a real ESP8266 board with a
-built-in 0.96" SSD1306 (SDA 14, SCL 12). The S3, C3, C6 and Heltec
-environments have not been built or run on hardware yet. If you try one,
-report the board and result.
+Compiles: `d1_mini`, `nodemcuv2`, `esp32dev`, `esp32s3`, `esp32c3`,
+`heltec_wifi_kit_32` and `heltec_wifi_kit_32_v3`. Not built: `esp32c6`
+(pioarduino download) and the `*_sh1106` / `esp32s3_usb` variants after the
+latest display changes.
+
+Run on hardware: only an ESP8266 with a built-in 0.96" SSD1306 (SDA 14, SCL 12).
+The panel was found and accepted its init commands. No ESP32 board has been
+flashed yet. If you try one, report the board and result.

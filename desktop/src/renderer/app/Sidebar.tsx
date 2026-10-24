@@ -7,7 +7,8 @@ import {
   Crown, Globe, Hash, KeyRound, Lock, Megaphone, Network, Plus, Radio, Search, Settings, ShieldHalf, Usb, Wifi,
 } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
-import { isOlder } from "../lib/flasher";
+import { assessFirmware, wantsUpdate } from "@core/firmware";
+import { VERSION } from "@core/protocol";
 import { dmConv, netKey, presence, roomConv, useApp } from "../lib/store";
 import { Logo } from "./Logo";
 
@@ -15,12 +16,14 @@ function ConnectionPill() {
   const conn = useApp((s) => s.conn);
   const neighbors = useApp((s) => Object.keys(s.neighbors).length);
   const setPanel = useApp((s) => s.setPanel);
-  const bundled = useApp((s) => s.firmware?.manifest.version);
+  const manifest = useApp((s) => s.firmware?.manifest);
   const detected = useApp((s) => s.usbDevices.find((d) => d.com && !d.driverMissing));
   const needsDriver = useApp((s) => s.usbDevices.some((d) => d.driverMissing));
   const wifiBusy = useApp((s) => s.wifiBusy);
   const network = useApp((s) => s.networks[netKey(s.conn.netId ?? 0)]);
-  const outdated = conn.status === "connected" && conn.kind === "usb" && !!bundled && isOlder(conn.fwVersion, bundled);
+  const outdated = conn.status === "connected" && conn.kind === "usb" && wantsUpdate(assessFirmware({
+    nodeFw: conn.fwVersion, nodeProtocol: conn.protocol ?? VERSION, nodeChip: conn.chip, appProtocol: VERSION, bundled: manifest,
+  }));
   const on = conn.status === "connected";
   const label = on
     ? conn.nodeName || `Node ${conn.chipId?.toString(16).toUpperCase().slice(-4) ?? ""}`

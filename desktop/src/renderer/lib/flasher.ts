@@ -57,14 +57,4 @@ export async function flashFirmware(port: SerialPort, image: Uint8Array, offset:
   }
 }
 
-/** "0.2.0" < "0.10.0". Missing version counts as oldest. */
-export function isOlder(a: string | undefined, b: string): boolean {
-  if (!a) return true;
-  const pa = a.split(".").map(Number);
-  const pb = b.split(".").map(Number);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
-    if (d) return d < 0;
-  }
-  return false;
-}
+export { isOlder } from "@core/firmware";

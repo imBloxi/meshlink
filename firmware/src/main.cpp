@@ -264,7 +264,9 @@ static void hostLog(const char *text) {
 static void hostInfo(uint8_t host) {
   const char *fw = ML_FW_VERSION;
   uint8_t fwLen = strlen(fw), nameLen = strlen(cfg.nodeName);
-  uint8_t f[96];
+  const char *chip = halChipName();
+  uint8_t chipLen = strlen(chip);
+  uint8_t f[128];  // fw <= 15, name <= 32, chip <= 20, plus fixed fields and 2 CRC bytes
   size_t n = 0;
   f[n++] = H_INFO;
   f[n++] = VERSION;
@@ -279,6 +281,9 @@ static void hostInfo(uint8_t host) {
   memcpy(f + n, &cfg.netId, 4); n += 4;
   f[n++] = nameLen;
   memcpy(f + n, cfg.nodeName, nameLen); n += nameLen;
+  // 0.5.0+: chip name, so the app knows which image fits this board.
+  f[n++] = chipLen;
+  memcpy(f + n, chip, chipLen); n += chipLen;
   hostSend(host, f, n);
 }
 

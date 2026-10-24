@@ -6,6 +6,16 @@ The desktop app and the node firmware share one version number. The app shows al
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-24
+
+### Added
+- **ESP32 support in the firmware.** One source tree builds for ESP8266, ESP32, ESP32-S3, ESP32-C3 and ESP32-C6 (Heltec WiFi Kit 32 and V3 included). All chips send the same ESP-NOW frames, so mixed meshes work. See [docs/boards.md](docs/boards.md).
+- **OLED status screen** (SSD1306 or SH1106 over I2C, found automatically): animated boot sequence, six rotating pages (node, Wi-Fi, radio, activity graph, mesh map, mascot) and pop-up notifications.
+- **Firmware compatibility checks in the app.** The node now reports its chip in the `INFO` frame. The app compares firmware version, protocol version and chip family: it offers "Update" only when the bundled image fits the board, tells you to use PlatformIO for ESP32 boards (the app flashes ESP8266 only), warns when a node speaks a newer protocol than the app, and leaves nodes with newer firmware alone. Pre-release versions such as `0.6.0-rc1` order correctly.
+
+### Changed
+- `INFO` carries a trailing `chipLen chip` field. Older apps ignore it, and the app reads older nodes that omit it. The air protocol is unchanged (v3).
+
 ## [0.4.2] - 2026-10-24
 
 ### Security

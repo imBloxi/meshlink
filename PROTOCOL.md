@@ -82,7 +82,7 @@ Guest permissions: `0` read only, `1` DMs and announces, `2` everything (default
 | `0x1B` REBOOT / `0x1C` FACTORY_RESET | admin → node | empty |
 | `0x1D` BANS_REQ | admin → node | empty |
 | `0x20` RECV | node → app | `airType(1) ttl(1) origin(4) msgId(4) flags(1) body` |
-| `0x21` INFO | node → app | `version(1) chipId(4) mac(6) channel(1) fwLen(1) fw role(1) perm(1) netId(4) nameLen(1) name` |
+| `0x21` INFO | node → app | `version(1) chipId(4) mac(6) channel(1) fwLen(1) fw role(1) perm(1) netId(4) nameLen(1) name chipLen(1) chip` (`chip` from firmware 0.5.0, for example `ESP8266` or `ESP32-C3`; an older node ends the frame after `name`) |
 | `0x22` LOG | node → admin | UTF-8 text |
 | `0x23` SENT | node → app | `msgId(4)` |
 | `0x24` CONFIG | node → admin | TLV list |

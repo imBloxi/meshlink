@@ -1,5 +1,6 @@
 // App state (zustand). Wires Messenger + Link + host storage together.
 import { createBackup, openBackup, type BackupContent } from "@core/backup";
+import { assessFirmware } from "@core/firmware";
 import { fromB64, fromHex, toB64, toHex, u32le } from "@core/bytes";
 import type { Contact } from "@core/contacts";
 import { fingerprint, Identity } from "@core/identity";
@@ -109,7 +110,7 @@ interface State {
   selected: string | null; // conversation: "dm:<fp>" | "room:<id>"
   invites: PendingInvite[];
   conn: {
-    status: ConnStatus; kind?: Link["kind"]; label?: string; chipId?: number; mac?: string; fwVersion?: string; error?: string;
+    status: ConnStatus; kind?: Link["kind"]; label?: string; chipId?: number; mac?: string; fwVersion?: string; chip?: string; protocol?: number; error?: string;
     role?: p.Role; perm?: p.Perm; netId?: number; nodeName?: string;
   };
   node: NodeAdminState;
@@ -360,7 +361,7 @@ export const useApp = create<State>((set, get) => {
         const netId = ev.netId ?? 0;
         set((s) => ({
           conn: {
-            ...s.conn, status: "connected", chipId: ev.chipId, mac: ev.mac, fwVersion: ev.fwVersion,
+            ...s.conn, status: "connected", chipId: ev.chipId, mac: ev.mac, fwVersion: ev.fwVersion, chip: ev.chip, protocol: ev.version,
             role: s.conn.kind === "usb" ? (ev.role ?? "admin") : "guest", perm: ev.perm, netId, nodeName: ev.nodeName,
           },
         }));
@@ -368,12 +369,17 @@ export const useApp = create<State>((set, get) => {
           messenger.netId = netId;
           messenger.setRooms(Object.values(get().rooms));
         }
-        log("node", `node ${ev.chipId.toString(16).toUpperCase()} fw ${ev.fwVersion ?? "?"} v${ev.version} ${ev.role ?? ""} net ${netId.toString(16)}`);
-        if (ev.version < p.VERSION) {
+        log("node", `node ${ev.chipId.toString(16).toUpperCase()} fw ${ev.fwVersion ?? "?"} ${ev.chip ?? ""} v${ev.version} ${ev.role ?? ""} net ${netId.toString(16)}`);
+        const fw = assessFirmware({
+          nodeFw: ev.fwVersion, nodeProtocol: ev.version, nodeChip: ev.chip, appProtocol: p.VERSION,
+          bundled: get().firmware?.manifest,
+        });
+        if (fw.state === "protocol-new") {
+          get().toast({ level: "warning", title: "This app is older than the node", body: fw.message });
+        } else if (fw.state === "protocol-old") {
           get().toast({
-            level: "warning", title: "Node firmware is outdated",
-            body: `This node runs protocol v${ev.version}. Update it to talk to v${p.VERSION} nodes.`,
-            action: { label: "Update", run: () => { get().disconnect(); get().setPanel("flasher", true); } },
+            level: "warning", title: "Node firmware is outdated", body: fw.message,
+            action: fw.canFlash ? { label: "Update", run: () => { get().disconnect(); get().setPanel("flasher", true); } } : undefined,
           });
         }
         if (isAdmin()) {
