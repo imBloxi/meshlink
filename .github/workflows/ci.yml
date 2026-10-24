@@ -70,6 +70,9 @@ jobs:
             adb root
             adb wait-for-device
             adb shell 'echo 0 > /proc/sys/net/ipv4/ip_unprivileged_port_start'
+            adb shell settings put global stay_on_while_plugged_in 3
+            adb shell input keyevent KEYCODE_WAKEUP
+            adb shell wm dismiss-keyguard
             cd mobile/android && bash ./gradlew connectedDebugAndroidTest --console=plain
       - uses: actions/upload-artifact@v4
         if: always()
