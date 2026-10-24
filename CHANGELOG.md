@@ -4,7 +4,9 @@ All notable changes. Versions follow [semantic versioning](https://semver.org/).
 
 The desktop app and the node firmware share one version number. The app shows all versions in **Settings → About**.
 
-## [Unreleased]
+## [0.4.1] - 2026-10-24
+
+Better installer and launch. No protocol changes: 0.4.1 and 0.4.0 apps and nodes work together.
 
 ### Added
 - Installer with a choice of folder and of "just me" or "all users", the license, branded pages, and an option to start MeshLink when done.
@@ -71,7 +73,7 @@ From an internal audit before the release. Details in [SECURITY.md](SECURITY.md)
 ## [0.1.0]
 - First version: ESP8266 relay firmware, Python/tkinter app, end-to-end encrypted DMs.
 
-[Unreleased]: https://github.com/imBloxi/meshlink/compare/v0.4.0...HEAD
+[0.4.1]: https://github.com/imBloxi/meshlink/releases/tag/v0.4.1
 [0.4.0]: https://github.com/imBloxi/meshlink/releases/tag/v0.4.0
 [0.3.0]: https://github.com/imBloxi/meshlink/releases/tag/v0.3.0
 [0.1.0]: https://github.com/imBloxi/meshlink/releases/tag/v0.1.0
