@@ -1,4 +1,6 @@
-// MeshLink node firmware v0.3 for ESP8266.
+// MeshLink node firmware v0.3 for ESP8266 and the ESP32 family (ESP32, S3, C3, C6).
+// Chip differences live in hal.h and chip.h. An optional I2C OLED shows status
+// (display.cpp).
 //
 // Radio: ESP-NOW broadcast flood. Each node relays frames it has not seen,
 // after a small random delay, until the TTL reaches 0. Every frame carries a
@@ -12,21 +14,18 @@
 //
 // The node never sees plaintext: apps encrypt end to end before sending.
 #include <BLAKE2s.h>
-#include <ESP8266WebServer.h>
-#include <ESP8266WiFi.h>
-#include <ESP8266mDNS.h>
 #include <Ed25519.h>
 #include <LittleFS.h>
 #include <WebSocketsServer.h>
 #include <WiFiUdp.h>
-#include <espnow.h>
 
 #include "config.h"
+#include "display.h"
+#include "hal.h"
 #include "protocol.h"
 
 using namespace ml;
 
-static uint8_t BROADCAST[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 static uint32_t chipId;
 
 // Counters for STATUS.
@@ -62,7 +61,7 @@ static bool isDuplicate(uint32_t msgId) {
 static uint32_t newMsgId() {
   uint32_t id;
   do {
-    id = ESP.random();
+    id = halRandom();
   } while (id == 0);
   return id;
 }
@@ -79,6 +78,42 @@ static void computeTag(const uint8_t *frame, size_t len, uint8_t *tag) {
   b.update(&zero, 1);
   b.update(frame + offsetof(AirHeader, ttl) + 1, len - offsetof(AirHeader, ttl) - 1);
   b.finalize(tag, TAG_LEN);
+}
+
+// ---- Nodes heard (for the screen) -----------------------------------------------
+
+struct Peer {
+  uint32_t id, lastMs;  // lastMs 0 = empty slot
+};
+static Peer peerTab[16];
+const uint32_t PEER_TTL_MS = 60000;
+
+static uint8_t peerCount() {
+  uint32_t now = millis();
+  uint8_t n = 0;
+  for (auto &p : peerTab) n += p.lastMs && now - p.lastMs < PEER_TTL_MS;
+  return n;
+}
+
+// Called for frames that passed the network tag, so outsiders do not show up.
+static void peerSeen(uint32_t id) {
+  uint32_t now = millis() | 1;
+  Peer *slot = nullptr, *oldest = &peerTab[0];
+  for (auto &p : peerTab) {
+    if (p.lastMs && p.id == id) { slot = &p; break; }
+    if (p.lastMs < oldest->lastMs) oldest = &p;
+  }
+  bool fresh = !slot || now - slot->lastMs >= PEER_TTL_MS;
+  if (!slot) {
+    slot = oldest;
+    slot->id = id;
+  }
+  slot->lastMs = now;
+  if (fresh) {
+    char name[16];
+    snprintf(name, sizeof(name), "Node %04X", (unsigned)(id & 0xFFFF));
+    displayNotify("Node heard", name);
+  }
 }
 
 // ---- Rate limit per origin node (token bucket) --------------------------------
@@ -139,7 +174,7 @@ static void pumpTx() {
   uint32_t now = millis();
   for (auto &t : txq) {
     if (t.used && (int32_t)(now - t.due) >= 0) {
-      esp_now_send(BROADCAST, t.data, t.len);
+      halNowSend(t.data, t.len);
       t.used = false;
     }
   }
@@ -164,7 +199,7 @@ struct Guest {
 static Guest guests[5];  // indexed by WebSocket client number
 
 static WebSocketsServer ws(81);
-static ESP8266WebServer http(80);
+static MlWebServer http(80);
 static WiFiUDP udp;
 static bool netUp = false;
 static bool mdnsUp = false;
@@ -268,6 +303,7 @@ static void deliver(const AirHeader &h, const uint8_t *body, size_t bodyLen) {
 }
 
 static void kickGuest(uint8_t num, uint8_t reason) {
+  if (guests[num].authed) displayNotify(reason == E_BANNED ? "Guest banned" : "Guest kicked");
   uint8_t f[4] = {H_KICKED, reason};
   ws.sendBIN(num, f, 2);
   ws.disconnect(num);
@@ -290,7 +326,7 @@ static uint32_t airSend(uint8_t type, uint8_t flags, const uint8_t *body, size_t
   if (len) memcpy(f + AIR_HDR, body, len);
   computeTag(f, AIR_HDR + len, f + AIR_HDR + len);
   isDuplicate(h.msgId);  // Ignore our own frame when a neighbor relays it.
-  esp_now_send(BROADCAST, f, AIR_HDR + len + TAG_LEN);
+  halNowSend(f, AIR_HDR + len + TAG_LEN);
   return h.msgId;
 }
 
@@ -327,6 +363,7 @@ static bool applyPolicy(const uint8_t *body, size_t len) {
   configSave();
   bansSave();
   hostLog("policy applied");
+  displayNotify("Policy applied", "signed by owner");
   return true;
 }
 
@@ -341,7 +378,7 @@ static RxSlot rxq[RXQ];
 static volatile uint8_t rxHead = 0, rxTail = 0;
 static volatile uint16_t rxDropped = 0;
 
-static void onRecv(uint8_t *mac, uint8_t *data, uint8_t len) {
+static void onRecv(const uint8_t *data, uint8_t len) {
   uint8_t next = (rxHead + 1) % RXQ;
   if (next == rxTail || len > MAX_AIR) {
     rxDropped++;
@@ -349,13 +386,14 @@ static void onRecv(uint8_t *mac, uint8_t *data, uint8_t len) {
   }
   rxq[rxHead].len = len;
   memcpy(rxq[rxHead].data, data, len);
+  __sync_synchronize();  // Dual-core chips: publish the bytes before the index.
   rxHead = next;
 }
 
 static void relay(uint8_t *data, uint8_t len, uint8_t ttl, bool priority) {
   if (ttl == 0) return;
   data[offsetof(AirHeader, ttl)] = min<uint8_t>(ttl, MAX_TTL) - 1;
-  uint16_t jitter = cfg.jitterMs ? 5 + ESP.random() % (cfg.jitterMs + 1) : 0;
+  uint16_t jitter = cfg.jitterMs ? 5 + halRandom() % (cfg.jitterMs + 1) : 0;
   queueAir(data, len, priority ? jitter / 4 : jitter);
   statRelayed++;
 }
@@ -390,6 +428,7 @@ static void handleAir(uint8_t *data, uint8_t len) {
     return;
   }
   seenAdd(h.msgId);
+  peerSeen(h.origin);
   if (!originAllowed(h.origin)) {
     statDropRate++;
     return;
@@ -494,9 +533,15 @@ static void handleHostFrame(uint8_t host, uint8_t *f, size_t n) {
       hostSend(host, r, 5);
       break;
     }
-    case H_INFO_REQ:
+    case H_INFO_REQ: {
+      static bool usbSeen = false;
+      if (admin && !usbSeen) {
+        usbSeen = true;
+        displayNotify("USB host", "app connected");
+      }
       hostInfo(host);
       break;
+    }
     case H_STATUS_REQ:
       sendStatus(host);
       break;
@@ -514,6 +559,7 @@ static void handleHostFrame(uint8_t host, uint8_t *f, size_t n) {
         return;
       }
       configSave();
+      displayNotify("Config saved", restart ? "restarting..." : nullptr);
       uint8_t out[400];
       out[0] = H_CONFIG;
       size_t len = configEncode(out + 1, sizeof(out) - 3);
@@ -564,12 +610,12 @@ static void handleHostFrame(uint8_t host, uint8_t *f, size_t n) {
       sendSessions(host);
       break;
     case H_REBOOT:
-      delay(100);
+      displayBye("Rebooting...");
       ESP.restart();
       break;
     case H_FACTORY_RESET:
       configFactoryReset();
-      delay(100);
+      displayBye("Factory reset");
       ESP.restart();
       break;
     default:
@@ -636,7 +682,7 @@ static void onWs(uint8_t num, WStype_t type, uint8_t *payload, size_t len) {
       s.connected = true;
       s.num = num;
       s.since = millis();  // Auth deadline starts now (see dropSlowAuth).
-      for (auto &b : s.nonce) b = ESP.random();
+      for (auto &b : s.nonce) b = halRandom();
       uint8_t f[64];
       size_t n = 0, nameLen = strlen(cfg.nodeName);
       f[n++] = H_HELLO;
@@ -649,6 +695,7 @@ static void onWs(uint8_t num, WStype_t type, uint8_t *payload, size_t len) {
       break;
     }
     case WStype_DISCONNECTED:
+      if (s.authed) displayNotify("Guest left");
       s.connected = false;
       s.authed = false;
       break;
@@ -681,6 +728,9 @@ static void onWs(uint8_t num, WStype_t type, uint8_t *payload, size_t len) {
         uint8_t ok[4] = {H_AUTH_OK, ROLE_GUEST, s.perm};
         ws.sendBIN(num, ok, 3);
         hostLog("guest joined");
+        char who[12];
+        snprintf(who, sizeof(who), "%02X%02X%02X%02X", s.pk[0], s.pk[1], s.pk[2], s.pk[3]);
+        displayNotify("Guest joined", who);
         return;
       }
       uint8_t f[MAX_AIR + 20];
@@ -773,7 +823,7 @@ static void startWifi() {
   WiFi.persistent(false);
   WiFi.mode(ap ? WIFI_AP_STA : WIFI_STA);
   WiFi.disconnect();
-  wifi_set_channel(cfg.channel);
+  halSetChannel(cfg.channel);
   if (ap) {
     const char *psk = cfg.apOpen || strlen(cfg.apPsk) < 8 ? nullptr : cfg.apPsk;
     WiFi.softAP(cfg.apSsid, psk, cfg.channel, cfg.apHidden || cfg.stealth, cfg.guestMax);
@@ -812,33 +862,95 @@ static void dropSlowAuth() {
 
 // ---- Main -------------------------------------------------------------------
 
+static void fillStats(DisplayStats &s) {
+  s.flashKB = ESP.getFlashChipSize() / 1024;
+  s.peers = peerCount();
+  s.nodeName = cfg.nodeName;
+  s.netName = cfg.netName;
+  s.apSsid = cfg.apSsid;
+  s.fw = ML_FW_VERSION;
+  s.chip = halChipName();
+  s.chipId = chipId;
+  s.uptimeS = millis() / 1000;
+  s.heap = ESP.getFreeHeap();
+  s.rx = statRx;
+  s.relayed = statRelayed;
+  s.dropTag = statDropTag;
+  s.dropRate = statDropRate;
+  s.apIp = cfg.apEnabled ? (uint32_t)WiFi.softAPIP() : 0;
+  s.staIp = (uint32_t)WiFi.localIP();
+  s.rxQueueDrops = rxDropped;
+  s.channel = WiFi.channel();
+  s.guests = guestCount();
+  s.apUp = cfg.apEnabled;
+  s.staState = cfg.staSsid[0] ? (WiFi.status() == WL_CONNECTED ? 2 : 1) : 0;
+}
+
+static void showStatus() {
+  DisplayStats s;
+  fillStats(s);
+  static uint8_t lastSta = 0;
+  if (s.staState != lastSta) {
+    if (s.staState == 2) {
+      char ip[20];
+      snprintf(ip, sizeof(ip), "%u.%u.%u.%u", (unsigned)(s.staIp & 0xFF), (unsigned)((s.staIp >> 8) & 0xFF), (unsigned)((s.staIp >> 16) & 0xFF), (unsigned)(s.staIp >> 24));
+      displayNotify("Home Wi-Fi up", ip);
+    } else if (lastSta == 2) {
+      displayNotify("Home Wi-Fi lost");
+    }
+    lastSta = s.staState;
+  }
+  displayUpdate(s);
+}
+
 void setup() {
   Serial.setRxBufferSize(1024);
   Serial.begin(115200);
-  chipId = ESP.getChipId();
+  chipId = halChipId();
   configInit(chipId);
+  // Screen first: the user sees the node is alive while Wi-Fi comes up.
+  const char *oled = displayInit(ML_FW_VERSION);
+  displayBootLine("Config", "OK");
   startWifi();
+  {
+    char v[16];
+    if (cfg.apEnabled) snprintf(v, sizeof(v), "ch%u", (unsigned)cfg.channel);
+    displayBootLine("Wi-Fi hotspot", cfg.apEnabled ? v : "off");
+    displayBootLine("Home Wi-Fi", cfg.staSsid[0] ? "joining" : "off");
+  }
 
-  if (esp_now_init() != 0) {
-    delay(1000);
+  if (!halNowBegin(cfg.channel, onRecv)) {
+    displayFatal("Radio init failed");
+    delay(1500);
     ESP.restart();
   }
-  esp_now_set_self_role(ESP_NOW_ROLE_COMBO);
-  esp_now_add_peer(BROADCAST, ESP_NOW_ROLE_COMBO, cfg.channel, NULL, 0);
-  esp_now_register_recv_cb(onRecv);
+  displayBootLine("Radio ESP-NOW", "OK");
+  displayBootLine("Network", cfg.netId ? "private" : "open");
+  {
+    char v[16];
+    snprintf(v, sizeof(v), "ttl %u", (unsigned)cfg.ttl);
+    displayBootLine("Relay", cfg.relayForeign ? v : "own net");
+  }
+  displayBootLine("Owner key", cfg.hasOwner ? "set" : "none");
 
   hostInfo(HOST_SERIAL);
+  hostLog(oled);
   hostLog("node ready");
+  DisplayStats s;
+  fillStats(s);
+  displayBootDone(s);
 }
 
 void loop() {
   pollSerial();
+  displayPoll();
+  if (displayDue()) showStatus();
   if (netUp) {
     ws.loop();
     dropSlowAuth();
     http.handleClient();
     pollUdp();
-    if (mdnsUp) MDNS.update();
+    if (mdnsUp) halMdnsUpdate();
   }
 
   while (rxTail != rxHead) {
@@ -857,5 +969,9 @@ void loop() {
   if (rxDropped != reportedDrops) {
     reportedDrops = rxDropped;
     hostLog("rx queue full, frame dropped");
+    displayNotify("Radio busy", "rx queue full");
   }
+#if !defined(ESP8266)
+  delay(1);  // Let the idle task run; the ESP8266 core yields on its own.
+#endif
 }

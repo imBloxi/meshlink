@@ -2,6 +2,8 @@
 
 #include <LittleFS.h>
 
+#include "chip.h"
+
 namespace ml {
 
 Config cfg;
@@ -27,7 +29,7 @@ static void defaults(uint32_t chipId) {
   snprintf(cfg.apSsid, sizeof(cfg.apSsid), "MeshLink-%04X", (unsigned)(chipId & 0xFFFF));
   // Random WPA2 password. The admin reads it over USB and shares it.
   const char *abc = "abcdefghjkmnpqrstuvwxyz23456789";
-  for (int i = 0; i < 12; i++) cfg.apPsk[i] = abc[ESP.random() % 31];
+  for (int i = 0; i < 12; i++) cfg.apPsk[i] = abc[halRandom() % 31];
   cfg.apPsk[12] = 0;
   cfg.guestPerm = PERM_FULL;
   cfg.guestMax = 4;
