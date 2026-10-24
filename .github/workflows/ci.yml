@@ -43,6 +43,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - uses: android-actions/setup-android@v4
+        with:
+          cmdline-tools-version: '12266719'
       - run: npm ci
         working-directory: desktop
       - run: npm run mobile:build
