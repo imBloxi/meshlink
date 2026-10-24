@@ -54,12 +54,19 @@ public class NodeConnectionTest {
     private volatile WebSocket node;
 
     @After public void cleanupOwnAccount() throws Exception {
-        if (scenario != null) scenario.close();
-        if (node != null) node.cancel();
-        if (server != null) server.shutdown();
-        if (vault != null) {
-            String saved = vault.load();
-            if (saved != null && name.equals(new JSONObject(saved).optString("name"))) vault.wipe();
+        try {
+            if (scenario != null) scenario.close();
+            // MockWebServer's upgraded server socket has no client Call to
+            // cancel. Close its WebSocket and let the server own socket cleanup.
+            if (node != null) node.close(1000, "Fixture complete");
+        } finally {
+            try { if (server != null) server.shutdown(); }
+            finally {
+                if (vault != null) {
+                    String saved = vault.load();
+                    if (saved != null && name.equals(new JSONObject(saved).optString("name"))) vault.wipe();
+                }
+            }
         }
     }
 
