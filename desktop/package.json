@@ -1,14 +1,15 @@
 {
   "name": "meshlink-desktop",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Private off-grid mesh messenger",
   "main": "out/main/index.cjs",
   "scripts": {
     "mobile:dev": "vite --config vite.mobile.config.ts",
     "mobile:build": "vite build --config vite.mobile.config.ts",
-    "check": "npm run repo:check && npm run test:scripts && npm run typecheck && npm test && npm run build",
+    "check": "npm run repo:check && npm run test:scripts && npm run typecheck && npm test && npm run build && npm run check:main",
     "repo:check": "node scripts/check-repository.mjs",
-    "test:scripts": "node --test scripts/check-repository.test.mjs",
+    "check:main": "node scripts/check-main-requires.mjs",
+    "test:scripts": "node --test scripts/check-repository.test.mjs scripts/check-main-requires.test.mjs",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "start": "electron-vite preview",

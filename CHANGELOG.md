@@ -6,6 +6,12 @@ The desktop app and the node firmware share one version number. The app shows al
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-24
+
+### Fixed
+- **The installed app crashed at launch** with `Cannot find module '@noble/hashes/blake2.js'`. Since 0.4.2 the main process imports the fingerprint code, whose crypto packages were left out of the installer. They are now bundled into the app, and `npm run check` fails if the main or preload script requires anything but Electron and Node built-ins. 0.4.2 and 0.5.0 were never published, so no released version is affected.
+- Firmware is unchanged from 0.5.0; only the version number moves.
+
 ## [0.5.0] - 2026-10-24
 
 ### Added

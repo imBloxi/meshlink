@@ -23,7 +23,9 @@ const alias = {
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin({ exclude: ["tweetnacl"] })],
+    // The installer ships no node_modules ("files" excludes them), so anything the
+    // main process imports from core/ must be bundled, not required at runtime.
+    plugins: [externalizeDepsPlugin({ exclude: ["tweetnacl", "@noble/hashes", "@scure/bip39"] })],
     build: { rollupOptions: { output: { format: "cjs", entryFileNames: "[name].cjs" } } },
     resolve: { alias },
   },
