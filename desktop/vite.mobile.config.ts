@@ -13,6 +13,8 @@ export default defineConfig({
     transformIndexHtml: (html) => html.replace(/\s*<meta http-equiv="Content-Security-Policy"[^>]*>/, ""),
   }],
   build: {
+    // Packaged CSP allows fonts from the app origin, not inline data URLs.
+    assetsInlineLimit: 0,
     outDir: resolve(__dirname, "../mobile/android/app/src/main/assets/public"),
     emptyOutDir: true,
   },

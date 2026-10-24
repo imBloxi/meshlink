@@ -1,6 +1,7 @@
 package dev.imbloxi.nodelink;
 
 import android.os.SystemClock;
+import android.webkit.WebView;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
@@ -11,6 +12,10 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import java.util.UUID;
 import static androidx.test.espresso.web.sugar.Web.onWebView;
+import static androidx.test.espresso.Espresso.onView;
+import static androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom;
+import static androidx.test.espresso.action.ViewActions.typeTextIntoFocusedView;
+import static androidx.test.espresso.action.ViewActions.closeSoftKeyboard;
 import static androidx.test.espresso.web.webdriver.DriverAtoms.*;
 import static androidx.test.espresso.web.assertion.WebViewAssertions.webMatches;
 import static org.hamcrest.Matchers.containsString;
@@ -46,7 +51,10 @@ public class AppFlowTest {
                 SystemClock.sleep(150);
             }
         }
-        throw new AssertionError("Packaged app did not show " + selector + ": " + text, last);
+        String page = "unavailable";
+        try { page = onWebView().withElement(findElement(Locator.CSS_SELECTOR, "body")).perform(getText()).get(); }
+        catch (RuntimeException | AssertionError ignored) { }
+        throw new AssertionError("Packaged app did not show " + selector + ": " + text + "; page=" + page.substring(0, Math.min(page.length(), 1500)), last);
     }
 
     @Test public void onboardingNavigationAndIdentitySurviveActivityRestart() throws Exception {
@@ -54,7 +62,10 @@ public class AppFlowTest {
         assumeTrue("UI smoke test requires a fresh app install; existing accounts are preserved", vault.load() == null);
         scenario = ActivityScenario.launch(MainActivity.class);
         waitForText("h1", "Stay close.");
-        onWebView().withElement(findElement(Locator.ID, "name")).perform(webKeys(name));
+        // WebDriver's synthetic setter can bypass React's controlled-input
+        // change tracking. Exercise the same native key events as a real user.
+        onWebView().withElement(findElement(Locator.ID, "name")).perform(webClick());
+        onView(isAssignableFrom(WebView.class)).perform(typeTextIntoFocusedView(name), closeSoftKeyboard());
         onWebView().withElement(findElement(Locator.CSS_SELECTOR, "button[type='submit']")).perform(webClick());
         waitForText("h1", "Conversations");
         JSONObject created = new JSONObject(vault.load());
