@@ -4,6 +4,18 @@ All notable changes. Versions follow [semantic versioning](https://semver.org/).
 
 The desktop app and the node firmware share one version number. The app shows all versions in **Settings → About**.
 
+## [Unreleased]
+
+### Added
+- Initial NodeLink Android client: foreground encrypted DMs, Wi-Fi guest authentication, delivery receipts, account recovery and contact safety-number verification. Reuses the desktop TypeScript protocol and crypto core, with Android Keystore-backed encrypted snapshots and a native Wi-Fi socket. Rooms, background delivery and USB administration are not yet supported.
+- Android build instructions, connection/storage tests, and a CI job that checks and packages a debug APK.
+- A single `npm run check` contributor command, with checks for source/lockfile version agreement and bundled firmware integrity, plus regression tests for those checks.
+- Desktop CI on Windows as well as Linux, a declared Node.js 24 runtime, and a development guide with a hardware-free simulator walkthrough.
+
+### Fixed
+- Android accounts remain readable after receiving long desktop messages, and history is pruned by encoded byte size to avoid filling the encrypted vault.
+- Source-build instructions now describe the included firmware, actual installer output path, and plaintext storage in the browser preview. Legacy Python compatibility is documented consistently.
+
 ## [0.4.1] - 2026-10-24
 
 Better installer and launch. No protocol changes: 0.4.1 and 0.4.0 apps and nodes work together.

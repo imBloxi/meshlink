@@ -39,8 +39,7 @@ jobs:
         working-directory: desktop
         run: |
           npm ci
-          npm run typecheck
-          npm test
+          npm run check
 
       - name: Build firmware and installer
         working-directory: desktop
@@ -48,6 +47,7 @@ jobs:
           MESHLINK_RELEASE_DIR: ${{ github.workspace }}/dist
         run: |
           npm run fw:bundle
+          npm run repo:check
           npm run dist
 
       - name: Collect files and checksums

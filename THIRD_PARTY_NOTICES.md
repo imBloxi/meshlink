@@ -26,6 +26,10 @@ cd desktop
 npx license-checker --production --summary
 ```
 
+## Android client dependencies
+
+NodeLink reuses the desktop crypto and UI dependencies above. The native Android shell uses AndroidX WebKit (Apache-2.0), OkHttp and Okio (Apache-2.0), and Kotlin standard-library dependencies (Apache-2.0). Gradle/Android Gradle Plugin are build tools. Versions are pinned in `mobile/android/app/build.gradle` and the Gradle wrapper configuration.
+
 ## Python app dependencies
 
 pyserial (BSD-3-Clause), PyNaCl (Apache-2.0).

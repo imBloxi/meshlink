@@ -6,7 +6,7 @@
   <a href="https://github.com/imBloxi/meshlink/actions/workflows/ci.yml"><img src="https://github.com/imBloxi/meshlink/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/imBloxi/meshlink/releases"><img src="https://img.shields.io/github/v/release/imBloxi/meshlink?include_prereleases&color=2ee6a6" alt="Latest release"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue.svg" alt="License: GPL-3.0"></a>
-  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20ESP8266-555" alt="Platform: Windows and ESP8266">
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Android%20%7C%20ESP8266-555" alt="Platform: Windows, Android and ESP8266">
   <a href="docs/break-meshlink.md"><img src="https://img.shields.io/badge/challenge-Break%20MeshLink-e5484d.svg" alt="Break MeshLink challenge"></a>
 </p>
 
@@ -92,15 +92,25 @@ The radio itself can't be hidden: someone with a receiver can see when MeshLink 
 
 ## Build from source
 
+**Android:** [NodeLink](mobile/README.md) is the initial Android client, with encrypted direct messages, Wi-Fi guest connections and contact verification using the shared protocol core. Build instructions and current limitations are in the mobile guide. It is not yet a published app-store release.
+
+Use **Node.js 24.x** and its bundled npm (also used in CI; `.nvmrc` records the major version). Windows is the supported desktop platform. Linux CI checks the portable core and build; it does not verify the Windows host integration.
+
+No account, API key, or environment file is needed. The repository includes a firmware image, so PlatformIO is only needed when changing or rebuilding firmware.
+
 ```bash
 cd desktop
-npm install
-npm run fw:bundle   # build the firmware into desktop/resources/firmware (needs PlatformIO)
+npm ci
+npm run check       # repository integrity, script tests, typecheck, app tests, build
 npm run dev         # run the app
-npm test            # protocol and crypto tests
-npm run dist        # Windows installer in desktop/release
+npm run fw:bundle   # optional: rebuild bundled firmware (needs PlatformIO)
+npm run dist        # Windows installer; output path is printed on completion
 npm run web         # UI only, in a browser, with the simulator (?profile=alice / ?profile=bob)
 ```
+
+On Windows, installers default to `%LOCALAPPDATA%\MeshLink-build\release`. Set `MESHLINK_RELEASE_DIR` to override this. See the [development guide](docs/development.md) for a two-person simulator walkthrough, architecture, and troubleshooting.
+
+**The browser preview is for development:** it stores identity keys and messages as plaintext in browser local storage. Use disposable identities and test messages there; the Windows app provides the encrypted storage described above.
 
 Firmware only, with [PlatformIO](https://platformio.org/):
 
@@ -115,6 +125,7 @@ pio run -e d1_mini -t upload   # or -e nodemcuv2
 
 ```
 desktop/    Electron app: TypeScript, React, crypto core in desktop/src/core
+mobile/     NodeLink Android shell; mobile React UI in desktop/src/mobile
 firmware/   ESP8266 node firmware: PlatformIO, Arduino core
 app/        Python app v0.1, protocol v1 (works only with 0.1 firmware, kept for reference)
 docs/       design notes and the Break MeshLink challenge

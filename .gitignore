@@ -4,5 +4,18 @@ __pycache__/
 .pytest_cache/
 .venv/
 
+# Local configuration and credentials. Keep example configuration shareable.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.log
+.DS_Store
+Thumbs.db
+
+# Optional installer output (MESHLINK_RELEASE_DIR).
+/dist/
+
 # Challenge secrets (keys + flags). Never commit.
 *challenge-secrets*.json
