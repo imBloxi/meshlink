@@ -1,9 +1,9 @@
-// MeshLink protocol v2: host frames between app and node. See PROTOCOL.md.
+// MeshLink protocol v3: host frames between app and node. See PROTOCOL.md.
 // Constants mirror firmware/src/protocol.h. App payloads (what goes inside an
 // air frame body) live in payloads.ts.
 import { concat, dec, enc, toHex, u32le } from "./bytes";
 
-export const VERSION = 2;
+export const VERSION = 3;
 export const MAX_AIR = 250;
 export const AIR_HEADER_LEN = 17;
 export const TAG_LEN = 8;

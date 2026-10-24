@@ -2,7 +2,7 @@
 import { createBackup, openBackup, type BackupContent } from "@core/backup";
 import { fromB64, fromHex, toB64, toHex, u32le } from "@core/bytes";
 import type { Contact } from "@core/contacts";
-import { Identity } from "@core/identity";
+import { fingerprint, Identity } from "@core/identity";
 import { dmConv, Messenger, roomConv, type MessengerOutput } from "@core/messenger";
 import { createNetwork, inviteOf, networkFromInvite, OPEN_NETWORK, type Network } from "@core/network";
 import * as pl from "@core/payloads";
@@ -190,8 +190,8 @@ let lastAutoCom: string | null = null;
 const autoFailed = new Set<string>();
 let wifiLoop: ReturnType<typeof setTimeout> | null = null;
 
-const toStored = (c: Contact): StoredContact => ({ ...c, pubkey: toB64(c.pubkey), signPk: c.signPk ? toB64(c.signPk) : null });
-const fromStored = (c: StoredContact): Contact => ({ ...c, pubkey: fromB64(c.pubkey), signPk: c.signPk ? fromB64(c.signPk) : null });
+const toStored = (c: Contact): StoredContact => ({ ...c, pubkey: toB64(c.pubkey), signPk: toB64(c.signPk) });
+const fromStored = (c: StoredContact): Contact => ({ ...c, pubkey: fromB64(c.pubkey), signPk: fromB64(c.signPk) });
 const hexOf = (b: Uint8Array) => toHex(b).match(/../g)?.join(" ") ?? "";
 const netKey = (id: number) => String(id >>> 0);
 
@@ -544,7 +544,7 @@ export const useApp = create<State>((set, get) => {
         api.getFirmware().catch(() => null), api.secretsWereReset(), api.availableDrivers(),
         api.listRecords<Room>("room"), api.listRecords<Network>("network"), api.listRecords<KnownNode>("node"),
       ]);
-      for (const c of contacts) contactsMap.set(c.fp, fromStored(c));
+      for (const c of contacts) if (c.signPk) contactsMap.set(c.fp, fromStored(c));
       set({
         ready: true,
         identity: sk ? new Identity(fromB64(sk)) : null,
@@ -630,7 +630,11 @@ export const useApp = create<State>((set, get) => {
       const b = await openBackup(text, passphrase);
       const id = new Identity(fromB64(b.identity));
       await api.setIdentity(b.identity);
-      for (const c of b.contacts as StoredContact[]) {
+      for (const old of b.contacts as StoredContact[]) {
+        // Backups from before protocol v3 hold the old fingerprint and may lack the signing key.
+        if (!old.signPk) continue;
+        const fp = toHex(fingerprint(fromB64(old.pubkey), fromB64(old.signPk)));
+        const c = fp === old.fp ? old : { ...old, fp, verified: false };
         await api.saveContact(c);
         contactsMap.set(c.fp, fromStored(c));
       }

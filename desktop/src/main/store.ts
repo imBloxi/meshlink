@@ -14,6 +14,8 @@ import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync 
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import nacl from "tweetnacl";
+import { toHex } from "../core/bytes";
+import { fingerprint } from "../core/identity";
 import type { MessageState, RecordKind, StoredContact, StoredMessage } from "../shared/api";
 import { protect, unprotect } from "./dpapi";
 
@@ -41,6 +43,7 @@ export class Store {
     this.db.exec("PRAGMA journal_mode = WAL; PRAGMA secure_delete = ON;");
     this.migrate();
     this.migrateV3();
+    this.migrateV4();
   }
 
   /** Keyed hash for lookup columns: equal inputs match, nothing else is revealed. */
@@ -48,7 +51,7 @@ export class Store {
     return createHmac("sha256", this.blindKey).update(`${kind}:${value}`).digest("hex").slice(0, 32);
   }
 
-  /** Schema versions: 0 = empty, 1 = v0.2 (DMs only), 2 = v0.3 (rooms, records), 3 = v0.4 (blind ids). */
+  /** Schema versions: 0 = empty, 1 = v0.2 (DMs only), 2 = v0.3 (rooms, records), 3 = v0.4 (blind ids), 4 = v0.5 (fingerprint covers the signing key). */
   private migrate() {
     const version = (this.db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version;
     const hasOld = !!this.db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='messages'").get();
@@ -121,6 +124,50 @@ export class Store {
     this.db.exec("PRAGMA wal_checkpoint(TRUNCATE); VACUUM;");
   }
 
+  /**
+   * v4 (protocol v3): the signing key is part of the fingerprint. Re-key every
+   * contact that has a signing key and move its direct messages along. The safety
+   * number changed, so the verified mark is cleared. A contact without a signing
+   * key has no new fingerprint: it is removed and returns with its next announce.
+   * Rooms are not migrated: their member ids use the old fingerprints and the
+   * old protocol version no longer interoperates anyway.
+   */
+  private migrateV4() {
+    const version = (this.db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version;
+    if (version >= 4) return;
+    this.db.exec("BEGIN");
+    try {
+      const delContact = this.db.prepare("DELETE FROM records WHERE kind = 'contact' AND id = ?");
+      const dmRows = this.db.prepare("SELECT uid, body FROM msg WHERE conv = ?");
+      const moveMsg = this.db.prepare("UPDATE msg SET conv = ?, body = ? WHERE uid = ?");
+      for (const c of this.listRecords("contact") as StoredContact[]) {
+        delContact.run(this.blind("contact", c.fp));
+        if (!c.signPk) continue;
+        const fp = toHex(fingerprint(Buffer.from(c.pubkey, "base64"), Buffer.from(c.signPk, "base64")));
+        if (fp === c.fp) {
+          this.putRecord("contact", fp, c);
+          continue;
+        }
+        this.putRecord("contact", fp, { ...c, fp, verified: false });
+        const oldConv = this.blind("conv", `dm:${c.fp}`), newConv = this.blind("conv", `dm:${fp}`);
+        for (const m of dmRows.all(oldConv) as { uid: string; body: string }[]) {
+          let body: { t: string; s: string; u: string };
+          try {
+            body = JSON.parse(this.open(m.body));
+          } catch {
+            continue;
+          }
+          if (body.s === c.fp) body.s = fp;
+          moveMsg.run(newConv, this.seal(JSON.stringify(body)), m.uid);
+        }
+      }
+      this.db.exec("PRAGMA user_version = 4; COMMIT");
+    } catch (e) {
+      this.db.exec("ROLLBACK");
+      throw e;
+    }
+  }
+
   // ---- Secrets ----
 
   private loadSecrets(): Secrets {
@@ -178,7 +225,7 @@ export class Store {
   }
 
   saveContact(c: StoredContact) {
-    // Same merge as before: the first key and first-seen time stay, a known signing key is never cleared.
+    // The first key and first-seen time stay.
     const row = this.db.prepare("SELECT body FROM records WHERE kind = 'contact' AND id = ?").get(this.blind("contact", c.fp)) as { body: string } | undefined;
     let old: StoredContact | null = null;
     try {
@@ -187,7 +234,7 @@ export class Store {
       old = null;
     }
     this.putRecord("contact", c.fp, {
-      ...c, pubkey: old?.pubkey ?? c.pubkey, firstSeen: old?.firstSeen ?? c.firstSeen, signPk: c.signPk ?? old?.signPk ?? null,
+      ...c, pubkey: old?.pubkey ?? c.pubkey, firstSeen: old?.firstSeen ?? c.firstSeen, signPk: old?.signPk ?? c.signPk,
     });
   }
 

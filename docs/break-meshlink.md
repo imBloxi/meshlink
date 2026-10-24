@@ -46,7 +46,7 @@ These are documented limits in [SECURITY.md](../SECURITY.md). They do not win pr
 - traffic analysis (who sent how much, and when),
 - the open network (netId 0), whose network key is public by design,
 - attacks that need Alice's or Bob's computer, keys or nodes,
-- the known open issue: **the signing key is not bound to the box key at first contact** (fix planned for 0.4),
+- the known issue that **the signing key was not bound to the box key at first contact**. This capture was made with protocol v2, which had it. Protocol v3 fixes it (see [SECURITY.md](../SECURITY.md)),
 - denial of service and jamming,
 - social engineering of the maintainers.
 

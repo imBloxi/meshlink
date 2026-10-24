@@ -1,4 +1,4 @@
-// MeshLink wire protocol v2 constants. Keep in sync with
+// MeshLink wire protocol v3 constants. Keep in sync with
 // desktop/src/core/protocol.ts and PROTOCOL.md.
 #pragma once
 #include <stddef.h>
@@ -7,9 +7,9 @@
 namespace ml {
 
 const uint8_t MAGIC = 0x4D;  // ASCII M
-const uint8_t VERSION = 2;   // Air protocol version.
+const uint8_t VERSION = 3;   // Air protocol version.
 // Firmware release. The desktop app compares this with its bundled image.
-#define ML_FW_VERSION "0.4.1"
+#define ML_FW_VERSION "0.4.2"
 const uint8_t DEFAULT_CHANNEL = 6;
 const uint8_t DEFAULT_TTL = 3;
 const uint8_t MAX_TTL = 7;

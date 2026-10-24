@@ -6,6 +6,16 @@ The desktop app and the node firmware share one version number. The app shows al
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-10-24
+
+### Security
+- **Protocol v3: the signing key is now part of the fingerprint.** Before, nothing tied a contact's Ed25519 signing key to their X25519 box key. Someone who announced your box key with their own signing key before a peer first heard from you could have that peer pin their key as "you", and sign room messages that showed as verified. The fingerprint is now `BLAKE2b-64("ml-fp-v3" | boxPk | signPk)`, so a box key announced with another signing key is a different identity. The safety number is derived from the fingerprints and changes with them.
+
+### Breaking
+- **Update every app and node together.** `protoVersion` (the air protocol version) is now `3`. Nodes and apps on version 2 drop each other's frames, and the app shows "Update node" for a v2 node. Every fingerprint and safety number changes, including your own.
+- Existing contacts that have a signing key are kept under their new fingerprint and their direct messages move with them, but **verified marks are cleared**: verify again in person. Contacts without a signing key are removed and return with their next announce. Rooms are not migrated: create them again.
+- Backups from before this version restore with the same rules.
+
 ### Added
 - Initial NodeLink Android client: foreground encrypted DMs, Wi-Fi guest authentication, delivery receipts, account recovery and contact safety-number verification. Reuses the desktop TypeScript protocol and crypto core, with Android Keystore-backed encrypted snapshots and a native Wi-Fi socket. Rooms, background delivery and USB administration are not yet supported.
 - Android build instructions, connection/storage tests, and a CI job that checks and packages a debug APK.
@@ -85,6 +95,7 @@ From an internal audit before the release. Details in [SECURITY.md](SECURITY.md)
 ## [0.1.0]
 - First version: ESP8266 relay firmware, Python/tkinter app, end-to-end encrypted DMs.
 
+[0.4.2]: https://github.com/imBloxi/meshlink/releases/tag/v0.4.2
 [0.4.1]: https://github.com/imBloxi/meshlink/releases/tag/v0.4.1
 [0.4.0]: https://github.com/imBloxi/meshlink/releases/tag/v0.4.0
 [0.3.0]: https://github.com/imBloxi/meshlink/releases/tag/v0.3.0

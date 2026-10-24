@@ -49,13 +49,26 @@ export function restoreSnapshot(json: string): { snapshot: Snapshot; identity: I
   displayName(value.name);
   const identity = new Identity(key(value.secret, 32));
   const contacts = new Map<string, Contact>();
+  // Protocol v3 puts the signing key into the fingerprint. Contacts saved by
+  // older versions get their new fingerprint and lose their verified mark (the
+  // safety number changed). Without a signing key there is nothing to derive
+  // it from: drop them, they return with their next announce.
+  const renamed = new Map<string, string>();
   for (const contact of value.contacts) {
     const pubkey = key(contact.pubkey, 32);
-    if (contact.fp !== toHex(fingerprint(pubkey)) || typeof contact.name !== "string" ||
-        typeof contact.verified !== "boolean" || !Number.isFinite(contact.firstSeen) || !Number.isFinite(contact.lastSeen)) {
+    if (typeof contact.name !== "string" || typeof contact.verified !== "boolean" ||
+        !Number.isFinite(contact.firstSeen) || !Number.isFinite(contact.lastSeen)) {
       throw new Error("Invalid contact in encrypted storage.");
     }
-    contacts.set(contact.fp, { ...contact, pubkey, signPk: contact.signPk === null ? null : key(contact.signPk, 32) });
+    if (contact.signPk === null) continue;
+    const signPk = key(contact.signPk, 32);
+    const fp = toHex(fingerprint(pubkey, signPk));
+    let verified = contact.verified;
+    if (fp !== contact.fp) {
+      renamed.set(contact.fp, fp);
+      verified = false;
+    }
+    contacts.set(fp, { ...contact, fp, pubkey, signPk, verified });
   }
   for (const message of value.messages) {
     if (!message || typeof message.id !== "string" || typeof message.text !== "string" ||
@@ -66,9 +79,13 @@ export function restoreSnapshot(json: string): { snapshot: Snapshot; identity: I
     }
     // Pending retries live in RAM; an app restart cannot resume those sends.
     if (message.state === "sending" || message.state === "sent") message.state = "failed";
+    const moved = renamed.get(message.conv.slice(3));
+    if (moved) message.conv = `dm:${moved}`;
+    const movedSender = renamed.get(message.senderFp);
+    if (movedSender) message.senderFp = movedSender;
   }
   return { snapshot: value, identity, contacts };
 }
 export const saveContacts = (contacts: Map<string, Contact>): SavedContact[] => [...contacts.values()].map((c) => ({
-  ...c, pubkey: toB64(c.pubkey), signPk: c.signPk ? toB64(c.signPk) : null,
+  ...c, pubkey: toB64(c.pubkey), signPk: toB64(c.signPk),
 }));

@@ -5,7 +5,7 @@ import { fingerprint } from "./identity";
 export interface Contact {
   fp: string; // hex fingerprint
   pubkey: Uint8Array; // X25519
-  signPk: Uint8Array | null; // Ed25519, from a signed announce
+  signPk: Uint8Array; // Ed25519, part of the fingerprint
   name: string;
   verified: boolean;
   firstSeen: number; // ms
@@ -14,8 +14,8 @@ export interface Contact {
 
 export type AnnounceVerdict = "known" | "new" | "impostor";
 
-export function makeContact(pubkey: Uint8Array, name: string, now = Date.now(), signPk: Uint8Array | null = null): Contact {
-  return { fp: toHex(fingerprint(pubkey)), pubkey, signPk, name, verified: false, firstSeen: now, lastSeen: now };
+export function makeContact(pubkey: Uint8Array, signPk: Uint8Array, name: string, now = Date.now()): Contact {
+  return { fp: toHex(fingerprint(pubkey, signPk)), pubkey, signPk, name, verified: false, firstSeen: now, lastSeen: now };
 }
 
 /**
@@ -30,9 +30,10 @@ export function makeContact(pubkey: Uint8Array, name: string, now = Date.now(), 
 export function classifyAnnounce(
   contacts: ReadonlyMap<string, Contact>,
   pubkey: Uint8Array,
+  signPk: Uint8Array,
   name: string,
 ): AnnounceVerdict {
-  const fp = toHex(fingerprint(pubkey));
+  const fp = toHex(fingerprint(pubkey, signPk));
   if (contacts.has(fp)) return "known";
   // A new key that uses the name of a contact you verified in person is
   // almost certainly someone posing as them. Only verified contacts are

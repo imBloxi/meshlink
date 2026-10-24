@@ -19,6 +19,7 @@
   <a href="#quick-start">Quick start</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#privacy-by-default">Privacy</a> ·
+  <a href="https://imbloxi.github.io/meshlink/">Website</a> ·
   <a href="PROTOCOL.md">Protocol</a> ·
   <a href="SECURITY.md">Security</a> ·
   <a href="docs/break-meshlink.md">Break it</a>
@@ -46,6 +47,8 @@ The installer is not code-signed yet, so SmartScreen may warn you. Choose **More
 
 ### 2. Flash two boards
 Plug a board into USB and choose **Connect → Flash a new board**. The app checks the bundled firmware's SHA-256 and writes it with Espressif's esptool-js. Repeat for the second board. No per-board setup is needed.
+
+> **Updating from 0.4.1 or older?** 0.4.2 changes the protocol (v3). Update every app **and reflash every node** together. Fingerprints and safety numbers change, so verify your contacts again. See the [changelog](CHANGELOG.md).
 
 ### 3. Chat
 Connect each board to a PC running MeshLink. The apps find each other and appear in **Contacts**.
@@ -90,6 +93,8 @@ MeshLink makes no network calls unless you ask, and it keeps as little as possib
 
 The radio itself can't be hidden: someone with a receiver can see when MeshLink frames are sent, and which node sent them. [SECURITY.md](SECURITY.md) lists what MeshLink does not protect.
 
+**Read the details:** [How MeshLink protects your privacy](docs/privacy.md) covers each layer, who can see what, and the known limits.
+
 ## Build from source
 
 **Android:** [NodeLink](mobile/README.md) is the initial Android client, with encrypted direct messages, Wi-Fi guest connections and contact verification using the shared protocol core. Build instructions and current limitations are in the mobile guide. It is not yet a published app-store release.
@@ -128,7 +133,8 @@ desktop/    Electron app: TypeScript, React, crypto core in desktop/src/core
 mobile/     NodeLink Android shell; mobile React UI in desktop/src/mobile
 firmware/   ESP8266 node firmware: PlatformIO, Arduino core
 app/        Python app v0.1, protocol v1 (works only with 0.1 firmware, kept for reference)
-docs/       design notes and the Break MeshLink challenge
+docs/       privacy guide, design notes and the Break MeshLink challenge
+site/       the project website (GitHub Pages)
 marketing/  social images
 ```
 

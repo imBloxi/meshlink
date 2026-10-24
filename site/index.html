@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MeshLink: private messages without the internet</title>
+<meta name="description" content="MeshLink sends end-to-end encrypted messages over a mesh of $3 ESP8266 boards. No internet, no router, no cloud, no sign-up.">
+<meta name="color-scheme" content="light dark">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<style>
+:root {
+  --paper: #e9ede8;
+  --paper-2: #dde3dc;
+  --ink: #0d1815;
+  --ink-2: #44524d;
+  --line: #bcc7bf;
+  --accent: #0a7556;
+  --accent-ink: #ffffff;
+  --panel: #0d1815;
+  --panel-text: #dff3ea;
+  --panel-dim: #7f9a90;
+  --signal: #2ee6a6;
+  --warn: #9a5a08;
+  --font: ui-sans-serif, "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0b1210; --paper-2: #121c19; --ink: #e4efe9; --ink-2: #9db0a8; --line: #26332f;
+    --accent: #2ee6a6; --accent-ink: #04130e; --panel: #060b0a; --warn: #f0b04a;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0b1210; --paper-2: #121c19; --ink: #e4efe9; --ink-2: #9db0a8; --line: #26332f;
+  --accent: #2ee6a6; --accent-ink: #04130e; --panel: #060b0a; --warn: #f0b04a;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 17px/1.55 var(--font); -webkit-font-smoothing: antialiased; }
+a { color: var(--accent); text-underline-offset: 3px; }
+a:hover { text-decoration-thickness: 2px; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 16px; }
+.skip { position: absolute; left: -999px; top: 8px; background: var(--ink); color: var(--paper); padding: 8px 12px; z-index: 9; }
+.skip:focus { left: 8px; }
+
+header.top { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 0; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; color: var(--ink); text-decoration: none; letter-spacing: -.01em; }
+.brand svg { width: 28px; height: 28px; }
+nav.main { display: flex; gap: 22px; flex-wrap: wrap; font-size: 15px; }
+nav.main a { color: var(--ink-2); text-decoration: none; }
+nav.main a:hover { color: var(--ink); text-decoration: underline; }
+
+.hero { padding: 44px 0 28px; }
+h1 { font-size: clamp(40px, 7.4vw, 84px); line-height: .98; letter-spacing: -.035em; margin: 0 0 22px; font-weight: 800; max-width: 14ch; }
+.lede { font-size: clamp(18px, 2.2vw, 22px); max-width: 52ch; color: var(--ink-2); margin: 0 0 26px; }
+.cta { display: flex; gap: 12px; flex-wrap: wrap; }
+.btn { display: inline-block; padding: 12px 20px; border-radius: 10px; font-weight: 650; text-decoration: none; border: 2px solid var(--ink); color: var(--ink); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn:hover { transform: translateY(-1px); }
+.fine { font-size: 14px; color: var(--ink-2); margin-top: 14px; max-width: 60ch; }
+
+/* Demo */
+.demo { margin: 34px 0 10px; display: grid; grid-template-columns: 1.15fr 1fr; background: var(--panel); color: var(--panel-text); border-radius: 18px; overflow: hidden; }
+.demo > section { padding: 22px; min-width: 0; }
+.demo > section + section { border-left: 1px solid #1f2d29; }
+.demo h2 { font-size: 15px; font-weight: 650; margin: 0 0 4px; color: var(--panel-text); letter-spacing: 0; }
+.demo p.cap { margin: 0 0 14px; font-size: 14px; color: var(--panel-dim); }
+.demo label { display: block; font-size: 14px; margin-bottom: 6px; color: var(--panel-dim); }
+.msgrow { display: flex; gap: 8px; }
+.msgrow input { flex: 1; min-width: 0; font: inherit; font-size: 16px; padding: 10px 12px; border-radius: 8px; border: 1px solid #2c3f39; background: #0f1a17; color: var(--panel-text); }
+.msgrow button { font: inherit; font-weight: 650; padding: 10px 16px; border-radius: 8px; border: 0; background: var(--signal); color: #04130e; cursor: pointer; }
+.msgrow input:focus-visible, .msgrow button:focus-visible { outline-color: var(--signal); }
+svg.mesh { width: 100%; height: auto; display: block; margin-top: 18px; }
+.mesh .link { stroke: #2c3f39; stroke-width: 2; stroke-dasharray: 3 5; }
+.mesh .node circle { fill: #0f1a17; stroke: #3b5249; stroke-width: 2; transition: fill .15s, stroke .15s; }
+.mesh .node text { fill: var(--panel-dim); font: 12px var(--font); text-anchor: middle; }
+.mesh .node.on circle { fill: var(--signal); stroke: var(--signal); }
+.mesh .node.on text { fill: var(--panel-text); }
+.status { font-size: 14px; color: var(--panel-dim); min-height: 2.9em; margin: 10px 0 0; }
+.status b { color: var(--panel-text); font-weight: 650; }
+.air { font: 13px/1.5 var(--mono); margin: 0; padding: 0; list-style: none; }
+.air li { padding: 7px 0; border-top: 1px solid #1f2d29; display: grid; grid-template-columns: 4.2em 5.6em 1fr; gap: 8px; color: var(--panel-dim); }
+.air li:first-child { border-top: 0; }
+.air .hex { color: var(--panel-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.air .len { color: var(--signal); }
+.air-empty { color: var(--panel-dim); font-size: 14px; }
+.summary { margin-top: 14px; font-size: 14px; color: var(--panel-dim); }
+.summary b { color: var(--signal); font-weight: 650; }
+.note { font-size: 13px; color: var(--panel-dim); margin-top: 10px; }
+
+section.block { padding: 64px 0 8px; }
+h2.sec { font-size: clamp(28px, 4vw, 42px); line-height: 1.05; letter-spacing: -.025em; margin: 0 0 14px; font-weight: 800; max-width: 22ch; }
+.sub { color: var(--ink-2); max-width: 62ch; margin: 0 0 26px; }
+
+/* Who sees what */
+table.matrix { width: 100%; border-collapse: collapse; font-size: 16px; }
+.matrix caption { text-align: left; color: var(--ink-2); font-size: 14px; padding-bottom: 8px; }
+.matrix th, .matrix td { text-align: left; vertical-align: top; padding: 14px 16px 14px 0; border-top: 1px solid var(--line); }
+.matrix thead th { border-top: 0; font-size: 14px; color: var(--ink-2); font-weight: 600; }
+.matrix tbody th { font-weight: 650; width: 24%; }
+.matrix td.sees { width: 38%; }
+.matrix td.hidden { color: var(--ink); }
+.matrix td.hidden::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); margin-right: 8px; }
+.matrix td.sees::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: var(--warn); margin-right: 8px; }
+
+.layers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-top: 2px solid var(--ink); }
+.layers > div { padding: 18px 22px 8px 0; }
+.layers > div + div { padding-left: 22px; border-left: 1px solid var(--line); }
+.layers h3 { margin: 0 0 6px; font-size: 18px; }
+.layers p { margin: 0 0 12px; color: var(--ink-2); font-size: 16px; }
+code, .mono { font-family: var(--mono); font-size: .9em; background: var(--paper-2); padding: 1px 6px; border-radius: 5px; }
+
+ol.steps { list-style: none; counter-reset: s; padding: 0; margin: 0; max-width: 62ch; }
+ol.steps li { counter-increment: s; padding: 0 0 20px 54px; position: relative; }
+ol.steps li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--accent); color: var(--accent); display: grid; place-items: center; font-weight: 700; }
+ol.steps b { display: block; }
+
+.limits { columns: 2; column-gap: 40px; padding-left: 20px; margin: 0; max-width: 900px; }
+.limits li { break-inside: avoid; margin-bottom: 12px; }
+.limits b { color: var(--warn); }
+
+.break { margin-top: 64px; padding: 28px; border-radius: 18px; background: var(--paper-2); display: grid; grid-template-columns: 1.4fr 1fr; gap: 24px; align-items: center; }
+.break h2 { margin: 0 0 8px; font-size: 26px; letter-spacing: -.02em; }
+.break p { margin: 0; color: var(--ink-2); }
+.break .cta { justify-content: flex-start; }
+
+footer { margin-top: 64px; padding: 28px 0 48px; border-top: 1px solid var(--line); font-size: 14px; color: var(--ink-2); }
+footer .cols { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+footer a { color: var(--ink-2); }
+
+@media (max-width: 860px) {
+  .demo { grid-template-columns: 1fr; }
+  .demo > section + section { border-left: 0; border-top: 1px solid #1f2d29; }
+  .layers { grid-template-columns: 1fr; }
+  .layers > div + div { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); }
+  .limits { columns: 1; }
+  .break { grid-template-columns: 1fr; }
+  .matrix thead { display: none; }
+  .matrix, .matrix tbody, .matrix tr, .matrix th, .matrix td { display: block; width: 100% !important; }
+  .matrix tr { border-top: 1px solid var(--line); padding: 14px 0; }
+  .matrix th, .matrix td { border: 0; padding: 4px 0; }
+  .matrix td[data-l]::after { content: ""; }
+  .matrix td[data-l] { margin-top: 4px; }
+  .matrix td[data-l]::marker { content: ""; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .btn:hover { transform: none; } * { transition: none !important; } }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<div class="wrap">
+  <header class="top">
+    <a class="brand" href="./" aria-label="MeshLink home">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="6" cy="16" r="4" fill="currentColor"/><circle cx="26" cy="7" r="4" fill="currentColor"/><circle cx="26" cy="25" r="4" fill="currentColor"/><path d="M9.5 14.5 22.5 8.5M9.5 17.5l13 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+      MeshLink
+    </a>
+    <nav class="main" aria-label="Main">
+      <a href="#privacy">Privacy</a>
+      <a href="#how">How it works</a>
+      <a href="#start">Get started</a>
+      <a href="#limits">Limits</a>
+      <a href="https://github.com/imBloxi/meshlink">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <div class="hero">
+      <h1>Messages that don't need the internet.</h1>
+      <p class="lede">MeshLink sends end-to-end encrypted messages through a mesh of $3 ESP8266 radio boards. No router, no cloud, no sign-up, and nothing for a server to log.</p>
+      <div class="cta">
+        <a class="btn primary" href="https://github.com/imBloxi/meshlink/releases">Download for Windows</a>
+        <a class="btn" href="#privacy">See what a listener sees</a>
+      </div>
+      <p class="fine">Free software under GPL-3.0. Pre-1.0 and not independently audited, so read <a href="#limits">what it does not hide</a> before you rely on it.</p>
+    </div>
+
+    <div class="demo" id="demo">
+      <section aria-labelledby="d1">
+        <h2 id="d1">You type a message</h2>
+        <p class="cap">It is encrypted on your PC. Boards only pass the result along.</p>
+        <form class="msgrow" id="form">
+          <div style="flex:1;min-width:0">
+            <label for="msg">Message</label>
+            <input id="msg" maxlength="400" value="Meet at the north gate at 6." autocomplete="off">
+          </div>
+          <button type="submit" style="align-self:flex-end">Send</button>
+        </form>
+        <svg class="mesh" id="mesh" viewBox="0 0 520 120" role="img" aria-label="Alice's PC, three radio boards and Bob's PC in a line. A message hops from board to board.">
+          <path class="link" d="M50 50H470"/>
+          <g class="node" data-i="0"><circle cx="50" cy="50" r="16"/><text x="50" y="92">Alice</text></g>
+          <g class="node" data-i="1"><circle cx="155" cy="50" r="12"/><text x="155" y="92">board</text></g>
+          <g class="node" data-i="2"><circle cx="260" cy="50" r="12"/><text x="260" y="92">board</text></g>
+          <g class="node" data-i="3"><circle cx="365" cy="50" r="12"/><text x="365" y="92">board</text></g>
+          <g class="node" data-i="4"><circle cx="470" cy="50" r="16"/><text x="470" y="92">Bob</text></g>
+        </svg>
+        <p class="status" id="status">Ready.</p>
+      </section>
+      <section aria-labelledby="d2">
+        <h2 id="d2">A listener with a radio hears</h2>
+        <p class="cap">Every frame is 225 bytes, whatever you wrote.</p>
+        <ul class="air" id="air"><li class="air-empty">Nothing yet. Send a message.</li></ul>
+        <p class="summary" id="summary"></p>
+        <p class="note">Illustration: random bytes stand in for the ciphertext. Real frames use NaCl <span class="mono">crypto_box</span>.</p>
+      </section>
+    </div>
+
+    <section class="block" id="privacy" aria-labelledby="ph">
+      <h2 class="sec" id="ph">What each person can see</h2>
+      <p class="sub">Privacy is not one switch. This is what MeshLink hides from each kind of observer, and what it cannot. Every row matches the code and the <a href="https://github.com/imBloxi/meshlink/blob/main/docs/privacy.md">privacy guide</a>.</p>
+      <table class="matrix">
+        <caption>Squares are what they can see. Circles are what stays hidden.</caption>
+        <thead><tr><th scope="col">Who</th><th scope="col">Can see</th><th scope="col">Cannot see</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Someone with a radio in range</th><td class="sees">That MeshLink frames exist, when, how many, and which board sent each first.</td><td class="hidden">What a message says, who a DM is for, how long it is, or whether it is a text, an invite or a receipt.</td></tr>
+          <tr><th scope="row">A board that relays your frames</th><td class="sees">Ciphertext and a header.</td><td class="hidden">Any message text. Boards hold no keys for your conversations.</td></tr>
+          <tr><th scope="row">Someone outside your network</th><td class="sees">That a radio signal exists.</td><td class="hidden">Nothing they send gets in. Boards drop frames without a valid network tag.</td></tr>
+          <tr><th scope="row">Someone who copies your database file</th><td class="sees">How many messages, contacts and rooms you have, with timestamps and delivery state.</td><td class="hidden">Message text, senders, contact names, fingerprints and room ids. All are encrypted or hashed with a key.</td></tr>
+          <tr><th scope="row">A guest on a board's Wi-Fi</th><td class="sees">A pseudonym key for that one network.</td><td class="hidden">Your account fingerprint. The pseudonym differs on every network.</td></tr>
+          <tr><th scope="row">An impostor using your name</th><td class="sees">Your public name and public keys, if you announce.</td><td class="hidden">A way to become you. Your fingerprint covers both your keys, so a copied key gives them a different identity.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="block" id="how" aria-labelledby="hh">
+      <h2 class="sec" id="hh">Three layers, each with its own job</h2>
+      <p class="sub">The app protects the message. The boards protect the mesh. The login protects the boards.</p>
+      <div class="layers">
+        <div><h3>App to app</h3><p>Your PC encrypts and signs every message before it leaves. Direct messages use X25519 and XSalsa20-Poly1305. Rooms add Ed25519 signatures and rotate their key when someone is removed.</p></div>
+        <div><h3>Board to board</h3><p>Boards flood frames over ESP-NOW radio, drop duplicates and rate-limit. Each frame carries a keyed BLAKE2s tag, so outsiders can't inject traffic.</p></div>
+        <div><h3>App to board</h3><p>USB for the admin, or the board's own hotspot for guests. Guests sign in with a per-network pseudonym that can't be linked to your account.</p></div>
+      </div>
+      <p class="fine">The full wire format is in <a href="https://github.com/imBloxi/meshlink/blob/main/PROTOCOL.md">PROTOCOL.md</a>.</p>
+    </section>
+
+    <section class="block" id="start" aria-labelledby="sh">
+      <h2 class="sec" id="sh">Be chatting in ten minutes</h2>
+      <p class="sub">You need two boards (a D1 mini or NodeMCU, about $3 each) and two PCs. No boards yet? The app has a simulator.</p>
+      <ol class="steps">
+        <li><b>Install the app</b>Download the Windows installer from <a href="https://github.com/imBloxi/meshlink/releases">Releases</a> and check it against <span class="mono">SHA256SUMS.txt</span>. It is not code-signed yet, so Windows SmartScreen may warn you. Choose More info, then Run anyway.</li>
+        <li><b>Flash two boards</b>Plug in a board and choose Connect, then Flash a new board. The app checks the firmware's SHA-256 before writing it.</li>
+        <li><b>Chat, then verify</b>Connect each board to a PC. Contacts appear on their own. Before you trust one, meet in person and compare the safety number under Contact, then Verify.</li>
+      </ol>
+    </section>
+
+    <section class="block" id="limits" aria-labelledby="lh">
+      <h2 class="sec" id="lh">What MeshLink does not hide</h2>
+      <p class="sub">A privacy tool should say this plainly.</p>
+      <ul class="limits">
+        <li><b>That you use it, and when.</b> Radio is visible. A listener sees timing and volume, and which board sent first.</li>
+        <li><b>Your announces.</b> Your name and public keys are broadcast so people can find you. Stealth mode stops automatic announces.</li>
+        <li><b>Forward secrecy.</b> Keys are static. A key stolen later opens traffic recorded earlier.</li>
+        <li><b>A compromised PC.</b> Malware running as you can use your keys.</li>
+        <li><b>Physical access to a board.</b> It stores its network key and Wi-Fi passwords in flash, unencrypted.</li>
+        <li><b>Jamming.</b> Nobody can stop radio jamming.</li>
+      </ul>
+    </section>
+
+    <aside class="break" aria-labelledby="bh">
+      <div>
+        <h2 id="bh">Think you can break it?</h2>
+        <p>We published a full radio capture of a private conversation. Decrypt it and win the prize. Found a flaw instead? Report it privately.</p>
+      </div>
+      <div class="cta">
+        <a class="btn primary" href="https://github.com/imBloxi/meshlink/blob/main/docs/break-meshlink.md">Break MeshLink</a>
+        <a class="btn" href="https://github.com/imBloxi/meshlink/blob/main/SECURITY.md">Report a flaw</a>
+      </div>
+    </aside>
+  </main>
+
+  <footer>
+    <div class="cols">
+      <div>MeshLink is free software under <a href="https://github.com/imBloxi/meshlink/blob/main/LICENSE">GPL-3.0</a>. <a href="https://github.com/imBloxi/meshlink">Source</a> · <a href="https://github.com/imBloxi/meshlink/blob/main/CHANGELOG.md">Changelog</a></div>
+      <div>This page loads nothing from other sites: no fonts, analytics or tracking.</div>
+    </div>
+  </footer>
+</div>
+
+<script>
+(function () {
+  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var nodes = Array.prototype.slice.call(document.querySelectorAll(".mesh .node"));
+  var air = document.getElementById("air");
+  var statusEl = document.getElementById("status");
+  var summary = document.getElementById("summary");
+  var input = document.getElementById("msg");
+  var ids = ["00C0FFEE", "5E11A4B2", "7D03C9F1"]; // example board ids
+  var timer = null;
+  var enc = new TextEncoder();
+
+  function hex(len) {
+    var b = new Uint8Array(len);
+    crypto.getRandomValues(b);
+    return Array.prototype.map.call(b, function (x) { return ("0" + x.toString(16)).slice(-2); }).join(" ");
+  }
+  function lit(i) { nodes.forEach(function (n, k) { n.classList.toggle("on", k === i); }); }
+  function esc(s) { return s.replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+
+  function send() {
+    clearTimeout(timer);
+    var text = input.value.trim();
+    if (!text) { statusEl.textContent = "Type a message first."; return; }
+    var bytes = enc.encode(text).length;
+    var cipher = hex(10);
+    var t0 = 0;
+    air.innerHTML = "";
+    summary.innerHTML = "";
+    var step = 0;
+    function tick() {
+      lit(step);
+      if (step === 0) {
+        statusEl.innerHTML = "<b>Alice's PC</b> encrypts and pads your " + bytes + "-byte message.";
+      } else if (step <= 3) {
+        statusEl.innerHTML = "<b>Board " + step + "</b> checks the network tag and relays the frame. It cannot read it.";
+        var li = document.createElement("li");
+        li.innerHTML = "<span>+" + t0.toFixed(2) + "s</span><span>" + ids[step - 1] + "</span><span class=\"hex\"><span class=\"len\">225 B</span> " + cipher + " …</span>";
+        air.appendChild(li);
+        t0 += 0.04 + Math.random() * 0.05;
+      } else {
+        statusEl.innerHTML = "<b>Bob's PC</b> tries each of its contacts' keys. One opens it: <b>" + esc(text) + "</b>";
+        summary.innerHTML = "You wrote <b>" + bytes + " bytes</b>. The listener saw <b>225 bytes</b>, three times, and the same bytes each time. Try a one-letter message: nothing changes.";
+        return;
+      }
+      step++;
+      timer = setTimeout(tick, reduce ? 200 : 750);
+    }
+    tick();
+  }
+  document.getElementById("form").addEventListener("submit", function (e) { e.preventDefault(); send(); });
+  send();
+})();
+</script>
+</body>
+</html>

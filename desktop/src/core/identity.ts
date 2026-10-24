@@ -1,6 +1,7 @@
 // User account: one 32-byte secret. Everything else derives from it.
 //
-//   box key   X25519 (NaCl box) - encryption; its fingerprint is the identity
+//   box key   X25519 (NaCl box) - encryption; with the sign key it forms the identity
+//             (fingerprint = BLAKE2b-64("ml-fp-v3" | boxPk | signPk))
 //   sign key  Ed25519 = seed BLAKE2b("meshlink-sign-v1" | sk) - signatures
 //   guest key Ed25519 per network - pseudonym toward Wi-Fi nodes, unlinkable
 //             between networks and never the account fingerprint
@@ -15,8 +16,12 @@ import { concat, enc, toHex, u32le } from "./bytes";
 
 export const FP_LEN = 8;
 
-export function fingerprint(pubkey: Uint8Array): Uint8Array {
-  return blake2b(pubkey, { dkLen: FP_LEN });
+/**
+ * Identity fingerprint. It covers both keys, so nobody can announce your box
+ * key with their own signing key and end up with your fingerprint.
+ */
+export function fingerprint(boxPk: Uint8Array, signPk: Uint8Array): Uint8Array {
+  return blake2b(concat(enc.encode("ml-fp-v3"), boxPk, signPk), { dkLen: FP_LEN });
 }
 
 /** "C50D 124A 8AAF 41A1" */
@@ -33,11 +38,11 @@ export class Identity {
 
   constructor(readonly secretKey: Uint8Array) {
     this.pubkey = nacl.box.keyPair.fromSecretKey(secretKey).publicKey;
-    this.fp = fingerprint(this.pubkey);
     const seed = blake2b(concat(enc.encode("meshlink-sign-v1"), secretKey), { dkLen: 32 });
     const kp = nacl.sign.keyPair.fromSeed(seed);
     this.signPk = kp.publicKey;
     this.signSk = kp.secretKey;
+    this.fp = fingerprint(this.pubkey, this.signPk);
   }
 
   static generate(): Identity {

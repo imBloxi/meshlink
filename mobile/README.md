@@ -10,7 +10,7 @@ NodeLink is the Android client for the MeshLink mesh. This first version support
 4. Return to NodeLink and connect to `192.168.4.1`, or the node's configured private IPv4 address.
 5. Keep the other app connected to the same mesh. Announced contacts appear in **Chats**. Compare safety numbers through a trusted channel before marking a contact verified.
 
-The app does not scan Wi-Fi networks or automatically switch your network. The native socket explicitly uses the connected Wi-Fi network, so cellular data does not redirect node traffic. The initial guest connection signs the node's challenge with a per-network pseudonym. It accepts only matching protocol-v2 INFO and guest access; it never sends USB administration commands or a network key.
+The app does not scan Wi-Fi networks or automatically switch your network. The native socket explicitly uses the connected Wi-Fi network, so cellular data does not redirect node traffic. The initial guest connection signs the node's challenge with a per-network pseudonym. It accepts only matching protocol-v3 INFO and guest access; it never sends USB administration commands or a network key.
 
 ## Build
 

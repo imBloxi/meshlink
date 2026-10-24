@@ -94,8 +94,10 @@ Two internal audits before the open-source release found these issues. All of th
 | Low | App | A crafted backup file could request a huge Argon2 parallelism value. | The `m`, `t` and `p` parameters are bounded. |
 | Low | Firmware | The node name was not escaped on the node's web page. | The name is HTML-escaped. |
 
-### Open issue (planned for 0.4)
+### Fixed in protocol v3
 
-**The signing key is not bound to the box key.** A contact's identity is the fingerprint of their X25519 box key. Their Ed25519 signing key comes from their first signed announce, and nothing proves that both keys belong to the same person. Suppose an attacker announces your public box key with their own signing key before a peer first hears from you. Then that peer pins the attacker's signing key for your fingerprint, and room messages the attacker signs show as "verified" from you. DMs are not affected, because they need your box secret key. The pinning rules stop this attack after first contact, not before it. Since 0.4.0, a room creator's key comes from the invite, and a contact's announced key wins over a room JOIN, which narrows the attack to room members who are not your contacts. The planned fix puts the signing key into the fingerprint and the safety number, which changes the protocol.
+| Severity | Component | Issue | Fix |
+|----------|-----------|-------|-----|
+| Medium | Protocol, App | The signing key was not bound to the box key. A contact's identity was the fingerprint of the X25519 box key only. An attacker who announced your public box key with their own Ed25519 signing key before a peer first heard from you got that key pinned as "you", and room messages the attacker signed showed as verified from you. For non-contact room members the pinning rules did not help. DMs were not affected. | The fingerprint is `BLAKE2b-64("ml-fp-v3" \| boxPk \| signPk)` and the safety number is derived from it. A box key announced with another signing key is a different fingerprint, so it cannot take your place. A room JOIN must carry a key pair that matches the sender fingerprint. The air protocol version is now 3. |
 
-Until then, compare safety numbers in person (Contact → Verify). Treat room messages from unverified contacts with care.
+Remaining limits: the fingerprint is 64 bits, so an attacker with large resources could search for a key pair that matches a chosen fingerprint. Verify the safety number in person (Contact → Verify) for contacts that matter. After the upgrade every verified mark is cleared, because every safety number changed.

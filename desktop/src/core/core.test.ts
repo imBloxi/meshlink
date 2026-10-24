@@ -5,7 +5,7 @@ import { concat, fromHex, toHex, u32le } from "./bytes";
 import type { Contact } from "./contacts";
 import { classifyAnnounce, makeContact } from "./contacts";
 import { cobsDecode, cobsEncode, crc16, encodeFrame, FrameReader } from "./framing";
-import { Identity, isValidPhrase, safetyNumber } from "./identity";
+import { fingerprint, Identity, isValidPhrase, safetyNumber } from "./identity";
 import { chunkBytes, CONTROL_MAX_AGE_S, FAIL_AT, Messenger, NEW_CONTACTS_PER_MIN, type MessengerOutput } from "./messenger";
 import { createNetwork, inviteOf } from "./network";
 import * as pl from "./payloads";
@@ -42,7 +42,6 @@ describe("framing (shared with the Python app and firmware)", () => {
     const alice = new Identity(fromHex(b.alice_sk));
     const bob = new Identity(fromHex(b.bob_sk));
     expect(toHex(alice.pubkey)).toBe(b.alice_pk);
-    expect(toHex(alice.fp)).toBe(b.alice_fp);
     const { ciphertext } = alice.seal(bob.pubkey, fromHex(b.plain), fromHex(b.nonce));
     expect(toHex(ciphertext)).toBe(b.ciphertext);
     expect(toHex(nacl.box.open(fromHex(b.ciphertext), fromHex(b.nonce), alice.pubkey, bob.secretKey)!)).toBe(b.plain);
@@ -106,6 +105,15 @@ describe("account", () => {
     expect(safetyNumber(a.fp, b.fp)).toBe(safetyNumber(b.fp, a.fp));
     expect(safetyNumber(a.fp, b.fp)).toMatch(/^(\d{5} ){11}\d{5}$/);
   });
+
+  it("fingerprint and safety number cover the signing key", () => {
+    const a = Identity.generate(), b = Identity.generate(), mallory = Identity.generate();
+    expect(toHex(fingerprint(b.pubkey, b.signPk))).toBe(toHex(b.fp));
+    // Same box key, other signing key: other fingerprint, other safety number.
+    const forged = fingerprint(b.pubkey, mallory.signPk);
+    expect(toHex(forged)).not.toBe(toHex(b.fp));
+    expect(safetyNumber(a.fp, forged)).not.toBe(safetyNumber(a.fp, b.fp));
+  });
 });
 
 describe("payloads", () => {
@@ -152,15 +160,17 @@ describe("payloads", () => {
   });
 
   it("a new key with a verified contact's name is an impostor", () => {
-    const alice = makeContact(Identity.generate().pubkey, "Alice");
+    const aliceId = Identity.generate();
+    const alice = makeContact(aliceId.pubkey, aliceId.signPk, "Alice");
     const contacts = new Map([[alice.fp, alice]]);
-    const other = Identity.generate().pubkey;
-    expect(classifyAnnounce(contacts, alice.pubkey, "Alice")).toBe("known");
-    expect(classifyAnnounce(contacts, other, " alice ")).toBe("new"); // not verified yet: no protection
+    const o = Identity.generate();
+    const other = o.pubkey, otherSign = o.signPk;
+    expect(classifyAnnounce(contacts, alice.pubkey, alice.signPk, "Alice")).toBe("known");
+    expect(classifyAnnounce(contacts, other, otherSign, " alice ")).toBe("new"); // not verified yet: no protection
     alice.verified = true;
-    expect(classifyAnnounce(contacts, other, " ALICE ")).toBe("impostor");
-    expect(classifyAnnounce(contacts, other, "Bob")).toBe("new");
-    expect(classifyAnnounce(contacts, other, "")).toBe("new");
+    expect(classifyAnnounce(contacts, other, otherSign, " ALICE ")).toBe("impostor");
+    expect(classifyAnnounce(contacts, other, otherSign, "Bob")).toBe("new");
+    expect(classifyAnnounce(contacts, other, otherSign, "")).toBe("new");
   });
 
   it("padding round-trips and rejects a missing marker", () => {
@@ -253,19 +263,37 @@ describe("messenger v2", () => {
     expect(messages({ out })).toEqual([]);
   });
 
-  it("announce: another signing key for a known contact is ignored", () => {
+  // Bob's public box key, Mallory's signing key.
+  const forgedAnnounce = (box: Uint8Array, mallory: Identity, nameStr: string) => {
+    const name = new TextEncoder().encode(nameStr);
+    const body = concat(box, mallory.signPk, u32le(Math.floor(Date.now() / 1000) + 60), Uint8Array.of(0, name.length), name);
+    return concat(body, mallory.sign(concat(new TextEncoder().encode("ml-announce"), body)));
+  };
+  const announceFrame = (body: Uint8Array, msgId: number) =>
+    ({ kind: "recv", airType: p.AIR_ANNOUNCE, ttl: 2, origin: 9, msgId, flags: 0, body }) as const;
+
+  it("announce: another signing key for a known contact does not touch that contact", () => {
     const [a, b] = mesh(["alice", "bob"]);
     introduce([a, b]);
     const mallory = Identity.generate();
-    const name = new TextEncoder().encode("mallory");
-    // Bob's public box key, Mallory's signing key and a new name.
-    const body = concat(b.id.pubkey, mallory.signPk, u32le(Math.floor(Date.now() / 1000) + 60), Uint8Array.of(0, name.length), name);
-    const forged = concat(body, mallory.sign(concat(new TextEncoder().encode("ml-announce"), body)));
-    const out = a.m.handle({ kind: "recv", airType: p.AIR_ANNOUNCE, ttl: 2, origin: 9, msgId: 998, flags: 0, body: forged });
+    a.m.handle(announceFrame(forgedAnnounce(b.id.pubkey, mallory, "mallory"), 998));
     const bob = a.m.contacts.get(toHex(b.id.fp))!;
     expect(bob.name).toBe("bob");
-    expect(toHex(bob.signPk!)).toBe(toHex(b.id.signPk));
-    expect(out.some((o) => o.kind === "notice" && o.level === "warning")).toBe(true);
+    expect(toHex(bob.signPk)).toBe(toHex(b.id.signPk));
+    // Mallory's announce is a separate, unverified contact with another fingerprint.
+    expect(a.m.contacts.size).toBe(2);
+  });
+
+  it("announce: announcing Bob's box key first does not make Mallory 'Bob'", () => {
+    const [a, b] = mesh(["alice", "bob"]);
+    const mallory = Identity.generate();
+    // Mallory gets in before Alice has heard from Bob.
+    a.m.handle(announceFrame(forgedAnnounce(b.id.pubkey, mallory, "bob"), 996));
+    expect(a.m.contacts.has(toHex(b.id.fp))).toBe(false);
+    expect(toHex(fingerprint(b.id.pubkey, mallory.signPk))).not.toBe(toHex(b.id.fp));
+    // The real Bob then arrives under his own fingerprint, with his own signing key.
+    introduce([a, b]);
+    expect(toHex(a.m.contacts.get(toHex(b.id.fp))!.signPk)).toBe(toHex(b.id.signPk));
   });
 
   it("announce: a replayed older announce does not roll back the name", () => {
@@ -299,8 +327,8 @@ describe("messenger v2", () => {
 
   it("retries over a lossy radio: every message ends delivered or failed", () => {
     const [a, b] = mesh(["alice", "bob"], 0.3, 7);
-    a.m.contacts.set(toHex(b.id.fp), makeContact(b.id.pubkey, "bob"));
-    b.m.contacts.set(toHex(a.id.fp), makeContact(a.id.pubkey, "alice"));
+    a.m.contacts.set(toHex(b.id.fp), makeContact(b.id.pubkey, b.id.signPk, "bob"));
+    b.m.contacts.set(toHex(a.id.fp), makeContact(a.id.pubkey, a.id.signPk, "alice"));
     const bobC = a.m.contacts.get(toHex(b.id.fp))!;
     const ids = Array.from({ length: 40 }, (_, i) => a.m.sendText(bobC, `m${i}`, 0).id);
     for (let t = 0; t <= FAIL_AT + 500; t += 250) a.out.push(...a.m.tick(t));

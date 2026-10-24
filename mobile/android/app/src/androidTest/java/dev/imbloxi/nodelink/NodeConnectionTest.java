@@ -105,7 +105,7 @@ public class NodeConnectionTest {
     }
     private ByteString info(int permission) {
         return ByteString.of(ByteBuffer.allocate(21).order(ByteOrder.LITTLE_ENDIAN)
-                .put((byte) 0x21).put((byte) 2).putInt(42).put(new byte[6])
+                .put((byte) 0x21).put((byte) 3).putInt(42).put(new byte[6])
                 .put((byte) 6).put((byte) 0).put((byte) 2).put((byte) permission).putInt(7).put((byte) 0).array());
     }
 
@@ -132,10 +132,11 @@ public class NodeConnectionTest {
         server.start(address, 81);
         byte[] secret = new byte[32];
         new SecureRandom().nextBytes(secret);
-        // Public test contact: X25519(secret=32 bytes of 7), BLAKE2b-64 fingerprint.
-        JSONObject contact = new JSONObject().put("fp", "108350c737e9ffd3")
+        // Public test contact: identity of secret=32 bytes of 7. The fingerprint is
+        // BLAKE2b-64("ml-fp-v3" | boxPk | signPk).
+        JSONObject contact = new JSONObject().put("fp", "f69dfbd07f835b0f")
                 .put("pubkey", "E75P6uryBMf9M1j8nAByGIHRdCeBKCJ+xnTzf3/pe20=")
-                .put("signPk", JSONObject.NULL).put("name", "Fixture Bob").put("verified", false)
+                .put("signPk", "KhE2qTZY5WGFZPbRtXEjlhrw5SOL3kKPO3qj6BqroEU=").put("name", "Fixture Bob").put("verified", false)
                 .put("firstSeen", 0).put("lastSeen", 0);
         vault.save(new JSONObject().put("version", 1).put("name", name).put("secret", Base64.encodeToString(secret, Base64.NO_WRAP))
                 .put("host", address.getHostAddress()).put("contacts", new JSONArray().put(contact)).put("messages", new JSONArray()).toString());

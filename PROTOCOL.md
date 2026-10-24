@@ -1,6 +1,6 @@
-# MeshLink Protocol v2
+# MeshLink Protocol v3
 
-This document describes what MeshLink 0.4 sends on the radio, over USB and over Wi-Fi. The code is the reference: `firmware/src/protocol.h`, `desktop/src/core/protocol.ts` and `desktop/src/core/payloads.ts`.
+This document describes what MeshLink sends on the radio, over USB and over Wi-Fi. The code is the reference: `firmware/src/protocol.h`, `desktop/src/core/protocol.ts` and `desktop/src/core/payloads.ts`.
 
 MeshLink has three layers. Each layer trusts only what it can check.
 
@@ -146,9 +146,10 @@ boxPk(32) signPk(32) ts(4) flags(1) nameLen(1) name(≤32) sig(64)
 sig = Ed25519(signKey, "ml-announce" | everything before sig)
 ```
 
-- Identity is the fingerprint `BLAKE2b-64(boxPk)`, shown as `C50D 124A 8AAF 41A1`. The name proves nothing.
+- Identity is the fingerprint `BLAKE2b-64("ml-fp-v3" | boxPk | signPk)`, shown as `C50D 124A 8AAF 41A1`. It covers both keys, so announcing someone's box key with another signing key gives a different fingerprint. The name proves nothing.
+- The safety number is derived from the two fingerprints, so it covers both keys of both people.
 - The signing key is derived from the account secret: `seed = BLAKE2b-256("meshlink-sign-v1" | secret)`.
-- After first contact the app pins the signing key. It ignores announces signed with another key and announces older than the newest one seen.
+- The app ignores announces older than the newest one seen for a fingerprint.
 - A new key that uses the name of a contact you **verified** is treated as an impostor and ignored with a warning.
 - Announces are sent on connect and every 60 seconds by default. In stealth mode they are never sent automatically.
 
@@ -193,7 +194,7 @@ roomTag = BLAKE2b-32("ml-room-tag" | roomId | epoch)
 
 Rules that receivers apply:
 
-- **Signing keys.** The creator's key comes from the invite. A contact's announced key wins over a key from a JOIN. A JOIN can only introduce a key for the fingerprint of the box key it carries, and never for the creator.
+- **Signing keys.** The creator's key comes from the invite. A contact's announced key wins over a key from a JOIN. A JOIN can only introduce a key pair whose fingerprint (`BLAKE2b-64("ml-fp-v3" | boxPk | signPk)`) equals the sender fingerprint of the frame, and never for the creator.
 - **Kicks.** A kick rotates the key (`epoch + 1`) and sends the new key by DM to every remaining member. The old key is accepted for 10 more minutes, but never from a removed member.
 - **Moderation freshness.** Moderator, kick, delete and leave frames older than 24 hours, more than 10 minutes in the future, or not newer than the last one applied from the same sender are refused. The last applied time is stored with the room, so replays fail even after a restart.
 
@@ -233,5 +234,7 @@ Nodes with an `ownerPk` apply a policy only if the signature checks and `seq` is
 | 0.4 app | Yes (unpadded DMs and rooms, v1 invites) | No: 0.3 apps cannot read padded DMs and room messages |
 
 Update every app on a network to 0.4 together. The air frame format and the firmware protocol version (`2`) did not change, so 0.3 and 0.4 nodes relay each other's traffic.
+
+**Protocol v3** (0.4.2) changes the fingerprint (section 4.2) and sets the air protocol version to `3`. v3 nodes drop v2 frames and the app refuses a v2 node. Fingerprints, safety numbers and room member ids all change, so v2 and v3 apps cannot talk to each other. Update every node and app on a network together.
 
 The Python app in `app/` speaks protocol **v1** (12-byte header, unsigned announces). It works only with 0.1 firmware and is kept for reference.

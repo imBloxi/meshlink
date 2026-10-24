@@ -323,8 +323,8 @@ export class Messenger {
   private onAnnounce(body: Uint8Array, now: number): MessengerOutput[] {
     const a = pl.unpackAnnounce(body);
     if (!a || equal(a.pubkey, this.me.pubkey)) return [];
-    const verdict = classifyAnnounce(this.contacts, a.pubkey, a.name);
-    const fp = makeContact(a.pubkey, a.name).fp;
+    const verdict = classifyAnnounce(this.contacts, a.pubkey, a.signPk, a.name);
+    const fp = makeContact(a.pubkey, a.signPk, a.name).fp;
     if (verdict === "impostor") {
       return [{
         kind: "notice", level: "warning",
@@ -341,7 +341,7 @@ export class Messenger {
         return [{ kind: "notice", level: "warning", text: "Many new keys are announcing nearby. New contacts are paused for now." }];
       }
       this.newContactTimes.push(now);
-      const c = makeContact(a.pubkey, a.name, now, a.signPk);
+      const c = makeContact(a.pubkey, a.signPk, a.name, now);
       this.contacts.set(c.fp, c);
       this.announceTs.set(c.fp, a.ts);
       return [
@@ -350,20 +350,14 @@ export class Messenger {
       ];
     }
     const c = this.contacts.get(fp)!;
-    // The box key is public, so anyone can announce it with their own signing
-    // key. Once a signing key is pinned, ignore announces signed by another.
-    if (c.signPk && !equal(c.signPk, a.signPk)) {
-      return [{
-        kind: "notice", level: "warning",
-        text: `Someone announced "${c.name}"'s key with a different signing key. Ignored.`,
-      }];
-    }
+    // The fingerprint covers both keys, so this announce uses the signing key
+    // we already have for this contact. Announcing their box key with another
+    // signing key gives a different fingerprint, and so a different contact.
     // Replayed old announces must not roll back the name.
     if (a.ts < (this.announceTs.get(fp) ?? 0)) return [];
     this.announceTs.set(fp, a.ts);
     c.lastSeen = now;
     c.name = a.name || c.name;
-    c.signPk ??= a.signPk;
     return [{ kind: "contact", contact: c }];
   }
 
@@ -467,10 +461,10 @@ export class Messenger {
       : isCreator ? (r.creatorSignPk || "")
       : (r.members[senderFp]?.signPk || "");
     // A JOIN may introduce a new member's key, but only for the fingerprint
-    // of the box key it carries, and never for the creator: otherwise any
+    // of the two keys it carries, and never for the creator: otherwise any
     // key holder could claim someone else's identity in the room.
     if (!signPkHex && !isCreator && c.kind === pl.ROOM_JOIN && full.payload.length >= 64
-      && toHex(fingerprint(full.payload.subarray(32, 64))) === senderFp) {
+      && toHex(fingerprint(full.payload.subarray(32, 64), full.payload.subarray(0, 32))) === senderFp) {
       signPkHex = toHex(full.payload.subarray(0, 32));
     }
     const msg = pl.roomSigMessage(fromHex(r.id), t.epoch, c.senderFp, c.kind, c.ts, c.group, full.payload);

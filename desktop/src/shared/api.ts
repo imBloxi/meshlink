@@ -4,7 +4,7 @@
 export interface StoredContact {
   fp: string; // hex fingerprint
   pubkey: string; // base64
-  signPk?: string | null; // base64 Ed25519
+  signPk: string; // base64 Ed25519; part of the fingerprint
   name: string;
   verified: boolean;
   firstSeen: number;
