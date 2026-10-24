@@ -1,0 +1,72 @@
+name: Release
+
+# Push a tag like v0.3.1. This builds the firmware and the Windows installer
+# and attaches them to a DRAFT release. A maintainer checks it and publishes.
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install platformio
+
+      - name: Tag matches app and firmware versions
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          app=$(node -p "require('./desktop/package.json').version")
+          fw=$(sed -n 's/#define ML_FW_VERSION "\(.*\)"/\1/p' firmware/src/protocol.h)
+          echo "tag $tag, app $app, firmware $fw"
+          test "$tag" = "$app" && test "$tag" = "$fw"
+
+      - name: Install, test
+        working-directory: desktop
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+
+      - name: Build firmware and installer
+        working-directory: desktop
+        env:
+          MESHLINK_RELEASE_DIR: ${{ github.workspace }}/dist
+        run: |
+          npm run fw:bundle
+          npm run dist
+
+      - name: Collect files and checksums
+        run: |
+          mkdir -p out
+          cp dist/*.exe out/
+          cp desktop/resources/firmware/meshlink-esp8266.bin "out/meshlink-esp8266-${GITHUB_REF_NAME}.bin"
+          cp desktop/resources/firmware/manifest.json "out/firmware-manifest-${GITHUB_REF_NAME}.json"
+          cd out && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+
+      - name: Release notes from CHANGELOG
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          awk -v v="$v" '$0 ~ "^## \\[" v "\\]" {on=1; next} /^## \[/ {on=0} on' CHANGELOG.md > notes.md
+          printf '\n---\nVerify downloads with `SHA256SUMS.txt`. The installer is not code-signed yet, so Windows SmartScreen may warn: choose "More info" and then "Run anyway".\n' >> notes.md
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          name: MeshLink ${{ github.ref_name }}
+          body_path: notes.md
+          files: out/*

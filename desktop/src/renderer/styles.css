@@ -1,0 +1,153 @@
+/* "Signal" design system tokens. See docs/design-system.md.
+   Raw values live in custom properties; light-dark() picks per color-scheme.
+   The root follows the OS theme unless data-theme forces one. */
+@import "tailwindcss";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
+
+:root {
+  color-scheme: light dark;
+
+  /* Neutrals */
+  --bg: light-dark(#f4f6f8, #0b0f14);
+  --surface: light-dark(#ffffff, #10151c);
+  --raised: light-dark(#ffffff, #161c25);
+  --sunken: light-dark(#eceff3, #0d1217);
+  --line: light-dark(#e1e6ec, #222a35);
+  --line-strong: light-dark(#cdd4dd, #2e3845);
+  --fg: light-dark(#0e141b, #e6eaf0);
+  --muted: light-dark(#5b6675, #8a96a6);
+  --faint: light-dark(#8a94a3, #5d6877);
+
+  /* Semantic */
+  --success: light-dark(#0f8a5f, #3ddc97);
+  --warning: light-dark(#a86400, #f5b83d);
+  --danger: light-dark(#c7303a, #f2545b);
+  --info: light-dark(#1f6feb, #4da3ff);
+
+  /* Accent: set by [data-accent]; teal is default */
+  --accent: light-dark(#0b8f63, #2ee6a6);
+  --accent-fg: light-dark(#ffffff, #03140d);
+
+  --accent-soft: color-mix(in oklab, var(--accent) 14%, transparent);
+  --accent-line: color-mix(in oklab, var(--accent) 40%, transparent);
+  --bubble-out: color-mix(in oklab, var(--accent) 88%, var(--bg));
+  --bubble-in: var(--raised);
+
+  /* Elevation */
+  --shadow-1: 0 1px 2px light-dark(rgb(16 24 40 / 0.06), rgb(0 0 0 / 0.4));
+  --shadow-2: 0 4px 16px light-dark(rgb(16 24 40 / 0.08), rgb(0 0 0 / 0.45));
+  --shadow-3: 0 16px 48px light-dark(rgb(16 24 40 / 0.16), rgb(0 0 0 / 0.6));
+
+  /* Motion */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+
+  /* Density */
+  --bubble-py: 0.5rem;
+  --bubble-px: 0.8rem;
+  --row-py: 0.6rem;
+
+  --font-scale: 1;
+
+  accent-color: var(--accent);
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+
+:root[data-accent="blue"] { --accent: light-dark(#1f6feb, #4da3ff); --accent-fg: light-dark(#fff, #031226); }
+:root[data-accent="violet"] { --accent: light-dark(#7c3aed, #a78bfa); --accent-fg: light-dark(#fff, #12072b); }
+:root[data-accent="amber"] { --accent: light-dark(#a15c00, #f5b83d); --accent-fg: light-dark(#fff, #221400); }
+:root[data-accent="rose"] { --accent: light-dark(#d61f45, #fb7185); --accent-fg: light-dark(#fff, #2a0610); }
+:root[data-accent="lime"] { --accent: light-dark(#4d7c0f, #a3e635); --accent-fg: light-dark(#fff, #0f1a02); }
+
+:root[data-density="compact"] {
+  --bubble-py: 0.3rem;
+  --bubble-px: 0.65rem;
+  --row-py: 0.4rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-fast: 0ms; --dur-base: 0ms; --dur-slow: 0ms; }
+}
+
+@theme inline {
+  --font-sans: "Inter Variable", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-sunken: var(--sunken);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-line: var(--accent-line);
+  --color-bubble-out: var(--bubble-out);
+  --color-bubble-in: var(--bubble-in);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+
+  --shadow-1: var(--shadow-1);
+  --shadow-2: var(--shadow-2);
+  --shadow-3: var(--shadow-3);
+
+  --ease-signal: var(--ease);
+}
+
+html {
+  font-size: calc(16px * var(--font-scale));
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+@keyframes enter {
+  from { opacity: 0; transform: translateY(4px) scale(0.99); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 var(--accent-line); }
+  100% { box-shadow: 0 0 0 6px transparent; }
+}
+
+.animate-enter {
+  animation: enter var(--dur-base) var(--ease) both;
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 1.6s var(--ease) infinite;
+}

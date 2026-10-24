@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/imBloxi/meshlink/security/advisories/new
+    about: Private report. Please do not open public issues for security bugs.
+  - name: Break MeshLink challenge
+    url: https://github.com/imBloxi/meshlink/blob/main/docs/break-meshlink.md
+    about: Rules and prize for breaking MeshLink's encryption.

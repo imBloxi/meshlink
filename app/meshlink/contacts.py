@@ -1,6 +1,7 @@
 """Contact store. Contacts are keyed by key fingerprint, never by name."""
 import base64
 import json
+import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -52,5 +53,15 @@ def classify_announce(contacts: dict[bytes, Contact], pubkey: bytes, name: str) 
     proves nothing. Only the key is identity. Return KNOWN, NEW or IMPOSTOR.
     """
     fp = fingerprint(pubkey)
-    # TODO(human)
-    return KNOWN if fp in contacts else NEW
+    if fp in contacts:
+        return KNOWN
+    # Same rule as the desktop app: a new key using a verified contact's name
+    # is treated as an impostor. Case and spaces are ignored.
+    key = _name_key(name)
+    if key and any(c.verified and _name_key(c.name) == key for c in contacts.values()):
+        return IMPOSTOR
+    return NEW
+
+
+def _name_key(name: str) -> str:
+    return "".join(unicodedata.normalize("NFKC", name).lower().split())

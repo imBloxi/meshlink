@@ -3,3 +3,6 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .venv/
+
+# Challenge secrets (keys + flags). Never commit.
+*challenge-secrets*.json

@@ -1,55 +1,132 @@
-# MeshLink
+<p align="center">
+  <img src="marketing/social/out/launch-github.png" alt="MeshLink: messages that don't need the internet" width="100%">
+</p>
 
-Private, off-grid messaging over a small mesh of ESP8266 boards. No internet, no router, no cloud.
+<p align="center">
+  <a href="https://github.com/imBloxi/meshlink/actions/workflows/ci.yml"><img src="https://github.com/imBloxi/meshlink/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/imBloxi/meshlink/releases"><img src="https://img.shields.io/github/v/release/imBloxi/meshlink?include_prereleases&color=2ee6a6" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-blue.svg" alt="License: GPL-3.0"></a>
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20ESP8266-555" alt="Platform: Windows and ESP8266">
+  <a href="docs/break-meshlink.md"><img src="https://img.shields.io/badge/challenge-Break%20MeshLink-e5484d.svg" alt="Break MeshLink challenge"></a>
+</p>
 
-- **Nodes** (ESP8266) relay messages to each other over ESP-NOW. A node plugged into nothing but power is a repeater.
-- **Windows app** talks to a node over USB and encrypts every message end to end. Nodes only ever see ciphertext.
+<p align="center">
+  <b>Private, off-grid messaging over a mesh of $3 ESP8266 boards.</b><br>
+  No internet, no router, no cloud, no sign-up. Private by default.
+</p>
 
-See [PROTOCOL.md](PROTOCOL.md) for the wire format.
+<p align="center">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#privacy-by-default">Privacy</a> ·
+  <a href="PROTOCOL.md">Protocol</a> ·
+  <a href="SECURITY.md">Security</a> ·
+  <a href="docs/break-meshlink.md">Break it</a>
+</p>
 
-## Quick start with two ESP8266 boards
+---
 
-### 1. Flash the firmware
-Install [PlatformIO](https://platformio.org/) (VS Code extension or `pip install platformio`), plug in a board, then:
+## Why MeshLink
 
+- **Works with no network at all.** Nodes talk to each other directly over ESP-NOW radio. A node plugged into nothing but power is a repeater.
+- **End-to-end encrypted.** The desktop app encrypts every message before it leaves your PC. Nodes only ever relay ciphertext.
+- **Cheap hardware.** A D1 mini or NodeMCU board costs about $3. The app flashes it for you.
+- **Direct messages and rooms.** Private rooms with invites, moderators and key rotation, plus public rooms anyone on your network can join.
+- **Your own network.** Give your nodes a network key. Outsiders can't send into it, and the network owner can ban nodes and guests with signed policies.
+- **Open and auditable.** GPL-3.0, a documented protocol, and a public [challenge](docs/break-meshlink.md) to break it.
+
+> **Think you can break it?** We published a full radio capture of a private conversation. Decrypt it and win: [Break MeshLink](docs/break-meshlink.md).
+
+## Quick start
+
+### 1. Get the app
+Download the Windows installer from [Releases](https://github.com/imBloxi/meshlink/releases) and check it against `SHA256SUMS.txt`.
+
+The installer is not code-signed yet, so SmartScreen may warn you. Choose **More info**, then **Run anyway**.
+
+### 2. Flash two boards
+Plug a board into USB and choose **Connect → Flash a new board**. The app checks the bundled firmware's SHA-256 and writes it with Espressif's esptool-js. Repeat for the second board. No per-board setup is needed.
+
+### 3. Chat
+Connect each board to a PC running MeshLink. The apps find each other and appear in **Contacts**.
+
+**Before you trust a contact, compare the safety number in person** (Contact → Verify). Anyone in radio range can pick any name.
+
+**No boards yet?** Choose **Connect → Simulator** in two app windows.
+
+## How it works
+
+```mermaid
+flowchart LR
+    A["Alice's PC<br/>MeshLink app"] -- USB / Wi-Fi --> N1(("Node"))
+    N1 -. ESP-NOW .-> N2(("Node"))
+    N2 -. ESP-NOW .-> N3(("Node"))
+    N3 -- USB / Wi-Fi --> B["Bob's PC<br/>MeshLink app"]
 ```
+
+| Layer | What it does | Crypto |
+|-------|--------------|--------|
+| App to app | Encrypts and signs every message | NaCl box / secretbox (X25519, XSalsa20-Poly1305), Ed25519 |
+| Node to node | Floods frames over ESP-NOW, drops duplicates, rate-limits | Keyed BLAKE2s tag with the network key |
+| App to node | USB serial (admin) or the node's Wi-Fi hotspot (guest) | Guest login with a per-network key |
+
+The full wire format is in [PROTOCOL.md](PROTOCOL.md).
+
+## Privacy by default
+
+MeshLink makes no network calls unless you ask, and it keeps as little as possible readable, on the air and on disk.
+
+| | Default |
+|---|---|
+| Message content | End-to-end encrypted. Nodes never see plaintext. |
+| Who a DM is for | Hidden. There is no recipient field: devices try their contacts' keys. |
+| Message length | Hidden. Every DM and room frame on the air is exactly 225 bytes. |
+| History on your PC | Encrypted, including contacts, senders and settings. The database file shows no names or fingerprints. |
+| Keys on your PC | Protected by Windows DPAPI. Encrypted backups use Argon2id. |
+| Notifications | Windows only shows "New message". |
+| Internet | No update checks or other requests unless you turn them on. |
+| Your Wi-Fi | The app never switches it to a node's hotspot unless you allow it. |
+| Nodes on your home network | Silent: guests and discovery work only on the node's own hotspot. |
+
+The radio itself can't be hidden: someone with a receiver can see when MeshLink frames are sent, and which node sent them. [SECURITY.md](SECURITY.md) lists what MeshLink does not protect.
+
+## Build from source
+
+```bash
+cd desktop
+npm install
+npm run fw:bundle   # build the firmware into desktop/resources/firmware (needs PlatformIO)
+npm run dev         # run the app
+npm test            # protocol and crypto tests
+npm run dist        # Windows installer in desktop/release
+npm run web         # UI only, in a browser, with the simulator (?profile=alice / ?profile=bob)
+```
+
+Firmware only, with [PlatformIO](https://platformio.org/):
+
+```bash
 cd firmware
-pio run -e d1_mini -t upload      # or -e nodemcuv2
+pio run -e d1_mini -t upload   # or -e nodemcuv2
 ```
 
-Repeat for the second board. No per-board configuration is needed.
+> **Windows tip:** if the build fails with "No such file or directory" in `.pio`, the path is too long. Set `PLATFORMIO_WORKSPACE_DIR` to a short folder such as `C:\mlb`.
 
-> Windows tip: if the build fails with "No such file or directory" in `.pio`, the path is too long. Set `PLATFORMIO_BUILD_DIR` to a short folder such as `C:\mlb`.
+## Repository layout
 
-### 2. Run the app
 ```
-cd app
-pip install -r requirements.txt
-python -m meshlink
-```
-
-Pick the COM port of your board and press **Connect**. Do the same on a second PC with the second board. Each app announces itself, and the other appears in **Contacts**. Select it and chat.
-
-**One PC, two boards:** run two copies with separate identities:
-```
-python -m meshlink --profile alice
-python -m meshlink --profile bob
+desktop/    Electron app: TypeScript, React, crypto core in desktop/src/core
+firmware/   ESP8266 node firmware: PlatformIO, Arduino core
+app/        Python app v0.1, protocol v1 (works only with 0.1 firmware, kept for reference)
+docs/       design notes and the Break MeshLink challenge
+marketing/  social images
 ```
 
-**No boards yet:** add `--sim` to use a localhost simulator instead of a node.
+## Contributing and security
 
-### 3. Verify keys
-Anyone in radio range can claim any name. Before trusting a contact, compare the key shown under **My key** on both screens, then press **Mark key verified**.
+- Contributions are welcome: read [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md).
+- **Found a vulnerability? Report it privately**, as described in [SECURITY.md](SECURITY.md). Do not open a public issue.
+- Changes per version: [CHANGELOG.md](CHANGELOG.md).
 
-## Tests
-```
-cd app
-pip install pytest
-python -m pytest
-```
+## License
 
-## Layout
-```
-firmware/   ESP8266 node (PlatformIO, Arduino core)
-app/        Windows app (Python, tkinter, pyserial, PyNaCl)
-```
+MeshLink is free software under the [GNU General Public License v3.0](LICENSE). You may use, study, change and share it. Versions you distribute must stay under the same license. Third-party components: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

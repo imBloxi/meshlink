@@ -1,0 +1,39 @@
+name: Bug report
+description: Something does not work as expected.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "**Security issue?** Do not file it here. Use Security → Report a vulnerability (see SECURITY.md)."
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Settings → About shows them. App, bundled firmware, node firmware.
+      placeholder: "App 0.3.1, firmware 0.3.1, Windows 11"
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options: [Desktop app, Node firmware, Flasher, Python app, Protocol / docs]
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. Connect two D1 mini boards\n2. ..."
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Settings → Advanced → frame log, if useful. Remove names and keys first.
+      render: text
