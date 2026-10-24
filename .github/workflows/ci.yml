@@ -64,7 +64,13 @@ jobs:
           target: google_apis
           arch: x86_64
           disable-animations: true
-          script: cd mobile/android && bash ./gradlew connectedDebugAndroidTest --console=plain
+          # The local node fixture listens on the firmware's fixed port 81.
+          # Allow that reserved port only inside this disposable emulator.
+          script: |
+            adb root
+            adb wait-for-device
+            adb shell 'echo 0 > /proc/sys/net/ipv4/ip_unprivileged_port_start'
+            cd mobile/android && bash ./gradlew connectedDebugAndroidTest --console=plain
       - uses: actions/upload-artifact@v4
         if: always()
         with:
