@@ -16,9 +16,9 @@ class FakeTransport implements FrameTransport {
   close() { this.closed = true; }
 }
 const hello = () => concat(new Uint8Array([p.H_HELLO]), new Uint8Array(16), u32le(42), u32le(7), new Uint8Array([0]));
-function info(version = p.VERSION) {
+function info(version = p.VERSION, perm = p.PERM_FULL, netId = 7) {
   return concat(new Uint8Array([p.H_INFO, version]), u32le(42), new Uint8Array(6),
-    new Uint8Array([6, 0, p.ROLE_GUEST, p.PERM_FULL]), u32le(7), new Uint8Array([0]));
+    new Uint8Array([6, 0, p.ROLE_GUEST, perm]), u32le(netId), new Uint8Array([0]));
 }
 
 describe("mobile node connection", () => {
@@ -63,6 +63,24 @@ describe("mobile node connection", () => {
     transport.frame(new Uint8Array([p.H_AUTH_OK, p.ROLE_GUEST, p.PERM_FULL]));
     transport.frame(info(p.VERSION + 1));
     await expect(connected).rejects.toThrow(/protocol/i);
+  });
+  it("refreshes live permissions while keeping the authenticated node pinned", async () => {
+    const transport = new FakeTransport();
+    const event = vi.fn();
+    const closed = vi.fn();
+    const link = new NodeLink(transport, Identity.generate());
+    const connected = link.open("192.168.4.1", event, closed);
+    transport.frame(hello());
+    transport.frame(new Uint8Array([p.H_AUTH_OK, p.ROLE_GUEST, p.PERM_FULL]));
+    transport.frame(info());
+    await connected;
+    link.refreshInfo();
+    expect(transport.sent.at(-1)).toEqual(new Uint8Array([p.H_INFO_REQ]));
+    transport.frame(info(p.VERSION, p.PERM_READ));
+    expect(event).toHaveBeenCalledWith(expect.objectContaining({ kind: "info", perm: p.PERM_READ }));
+    transport.frame(info(p.VERSION, p.PERM_FULL, 99));
+    expect(closed).toHaveBeenCalledWith(expect.stringMatching(/identity|permissions/i));
+    expect(transport.closed).toBe(true);
   });
   it("settles cancelled connections and closes timed-out sockets", async () => {
     vi.useFakeTimers();

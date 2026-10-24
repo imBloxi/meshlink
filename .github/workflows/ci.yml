@@ -48,8 +48,6 @@ jobs:
           cmdline-tools-version: '12266719'
       - run: npm ci
         working-directory: desktop
-      - run: npm run mobile:build
-        working-directory: desktop
       - name: Install Android SDK components
         run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
       - run: bash ./gradlew testDebugUnitTest lintDebug assembleDebug assembleDebugAndroidTest --console=plain

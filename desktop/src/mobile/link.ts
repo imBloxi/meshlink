@@ -77,23 +77,29 @@ export class NodeLink {
               }
               stage = "info";
               this.transport.send(new Uint8Array([p.H_INFO_REQ]));
-            } else if (stage === "info") {
+            } else if (stage === "info" || ev.kind === "info") {
               if (ev.kind !== "info") return;
               if (ev.version !== p.VERSION) throw new Error(`Unsupported node protocol v${ev.version}; this app needs v${p.VERSION}.`);
               if (ev.role !== "guest" || ev.netId !== netId || ev.chipId !== chipId || ![0, 1, 2].includes(ev.perm ?? -1)) {
-                throw new Error("Node identity or guest permissions changed during authentication.");
+                throw new Error("Node identity or guest permissions are invalid. Reconnect to the node.");
               }
+              if (stage === "ready") { event(ev); return; }
               stage = "ready";
               this.ready = true;
               clearTimeout(timer);
               resolve(ev);
-            } else if (ev.kind !== "hello" && ev.kind !== "authOk" && ev.kind !== "info") {
+            } else if (ev.kind !== "hello" && ev.kind !== "authOk") {
               event(ev);
             }
           } catch (error) { fail(error instanceof Error ? error.message : "Invalid node frame."); }
         }, fail);
       } catch (error) { fail(error instanceof Error ? error.message : "Connection failed."); }
     });
+  }
+
+  refreshInfo() {
+    if (!this.ready) throw new Error("Connect to a node first.");
+    this.transport.send(new Uint8Array([p.H_INFO_REQ]));
   }
 
   send(frame: Uint8Array) {

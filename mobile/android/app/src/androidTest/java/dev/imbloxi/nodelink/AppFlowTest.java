@@ -86,5 +86,35 @@ public class AppFlowTest {
         assertEquals(identity, new JSONObject(vault.load()).getString("secret"));
         onWebView().withElement(findElement(Locator.CSS_SELECTOR, "nav button:nth-child(3)")).perform(webClick());
         waitForText(".identity-card h2", name);
+        onWebView().withElement(findElement(Locator.CSS_SELECTOR, ".panel:nth-of-type(2) button")).perform(webClick());
+        String phrase = onWebView().withElement(findElement(Locator.CSS_SELECTOR, ".recovery-phrase")).perform(getText()).get();
+        assertEquals(24, phrase.trim().split("\\s+").length);
+
+        // An encrypted but invalid snapshot must offer recovery, preserve its
+        // contents on retry, and delete it only after the explicit RESET flow.
+        scenario.close();
+        String invalidSnapshot = new JSONObject().put("name", name).toString();
+        vault.save(invalidSnapshot);
+        scenario = ActivityScenario.launch(MainActivity.class);
+        waitForText("h1", "Recover secure storage");
+        onWebView().withElement(findElement(Locator.CSS_SELECTOR, ".storage-recovery .primary")).perform(webClick());
+        waitForText("h1", "Recover secure storage");
+        assertEquals(invalidSnapshot, vault.load());
+        onWebView().withElement(findElement(Locator.CSS_SELECTOR, ".danger-button")).perform(webClick());
+        onView(isAssignableFrom(WebView.class)).perform(click());
+        onWebView().withElement(findElement(Locator.ID, "reset-confirmation")).perform(webClick());
+        onView(isAssignableFrom(WebView.class)).perform(typeTextIntoFocusedView("RESET"), closeSoftKeyboard());
+        onWebView().withElement(findElement(Locator.CSS_SELECTOR, ".danger-button[type='submit']")).perform(webClick());
+        waitForText("h1", "Stay close.");
+        assertNull(vault.load());
+
+        onWebView().withElement(findElement(Locator.CSS_SELECTOR, ".onboarding-form .text-button")).perform(webClick());
+        onWebView().withElement(findElement(Locator.ID, "name")).perform(webClick());
+        onView(isAssignableFrom(WebView.class)).perform(typeTextIntoFocusedView(name), closeSoftKeyboard());
+        onWebView().withElement(findElement(Locator.ID, "recovery")).perform(webClick());
+        onView(isAssignableFrom(WebView.class)).perform(typeTextIntoFocusedView(phrase), closeSoftKeyboard());
+        onWebView().withElement(findElement(Locator.CSS_SELECTOR, ".onboarding-form button[type='submit']")).perform(webClick());
+        waitForText("h1", "Conversations");
+        assertEquals(identity, new JSONObject(vault.load()).getString("secret"));
     }
 }

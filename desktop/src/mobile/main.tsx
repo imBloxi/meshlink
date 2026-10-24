@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowUpRight, Check, CheckCheck, ChevronRight, Fingerprint, 
 import { formatFp, safetyNumber } from "../core/identity";
 import type { ChatMessage } from "../core/messenger";
 import { backgroundApp, isAndroid, openWifi } from "./host";
-import { clearError, connect, contactBytes, createAccount, disconnect, eraseAccount, initialize, sendMessage, useMobile, verifyContact } from "./session";
+import { clearError, connect, contactBytes, createAccount, disconnect, eraseAccount, initialize, resetStorage, retryStorage, sendMessage, useMobile, verifyContact } from "./session";
 import "./styles.css";
 
 function Brand() { return <span className="brand-mark" aria-hidden="true"><Radio size={25} strokeWidth={1.6} /></span>; }
@@ -45,6 +45,22 @@ function Welcome() {
     </form>
     <footer><ShieldCheck size={15} /><span>End-to-end encrypted. Keys stay on your phone.</span></footer>
   </div>;
+}
+
+function StorageRecovery() {
+  const identity = useMobile((s) => s.identity);
+  const [showPhrase, setShowPhrase] = useState(false);
+  const [reset, setReset] = useState(false);
+  const [confirmation, setConfirmation] = useState("");
+  const [error, setError] = useState("");
+  return <main className="page storage-recovery">
+    <Brand /><div className="page-title"><h1>Recover secure storage</h1></div>
+    <section className="panel"><h2>Your account is preserved</h2><p>NodeLink paused the connection because it couldn’t read or save your encrypted account. Free some phone storage if needed, then try again.</p><button className="primary" onClick={retryStorage}>Retry secure storage</button></section>
+    {identity && <section className="panel"><h2>Save your recovery phrase</h2><p>Your identity is still open in memory. Save these words privately before resetting or closing the app. Unsaved messages may be lost when you close it.</p>{showPhrase && <p className="recovery-phrase mono">{identity.phrase()}</p>}<button className="secondary" onClick={() => setShowPhrase(!showPhrase)}>{showPhrase ? "Hide recovery phrase" : "Show recovery phrase"}</button></section>}
+    <section className="panel danger-panel"><h2>Reset and restore</h2><p>If retrying doesn’t help, you can remove this phone’s account and restore your identity with its 24-word recovery phrase. Resetting permanently deletes local contacts and message history. A recovery phrase restores only your identity.</p>
+      {reset ? <form onSubmit={(event) => { event.preventDefault(); try { resetStorage(confirmation); } catch (e) { setError(e instanceof Error ? e.message : "Could not reset storage."); } }}><label htmlFor="reset-confirmation">Type RESET to delete the local account</label><input id="reset-confirmation" autoComplete="off" autoCorrect="off" spellCheck={false} value={confirmation} onChange={(e) => setConfirmation(e.target.value)} /><button className="danger-button" type="submit" disabled={confirmation !== "RESET"}>Delete local account and history</button><button className="text-button" type="button" onClick={() => { setReset(false); setConfirmation(""); }}>Keep encrypted account</button></form> : <button className="danger-button" onClick={() => setReset(true)}>Reset local storage…</button>}
+    </section>{error && <ErrorBanner text={error} />}
+  </main>;
 }
 
 function ConnectionCard({ onOpen }: { onOpen: () => void }) {
@@ -121,8 +137,16 @@ function Conversation({ fp, back }: { fp: string; back: () => void }) {
   const [error, setError] = useState("");
   const [details, setDetails] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
+  const atBottom = useRef(true);
+  const [newMessages, setNewMessages] = useState(false);
   const conversation = messages.filter((m) => m.conv === `dm:${fp}`);
-  useEffect(() => { bottom.current?.scrollIntoView({ behavior: "instant" }); }, [messages.length, fp]);
+  const latest = conversation.at(-1);
+  const jumpToLatest = () => { bottom.current?.scrollIntoView({ behavior: "instant" }); atBottom.current = true; setNewMessages(false); };
+  useEffect(() => {
+    // IDs change even when retention prunes one message for each arrival.
+    if (atBottom.current || latest?.outgoing) jumpToLatest();
+    else setNewMessages(true);
+  }, [latest?.id, fp]);
   if (!contact || !identity) return null;
   const submit = (event: FormEvent) => {
     event.preventDefault(); setError("");
@@ -131,11 +155,16 @@ function Conversation({ fp, back }: { fp: string; back: () => void }) {
   return <div className="conversation">
     <header className="conversation-header"><button className="icon-button" aria-label="Back to conversations" onClick={back}><ArrowLeft size={22} /></button><span className="avatar small">{Array.from(contact.name || "?")[0].toUpperCase()}</span><button className="contact-heading" onClick={() => setDetails(!details)}><strong>{contact.name || "Unnamed contact"}</strong><small>{contact.verified ? "Verified in person" : "Identity not yet verified"}</small></button><button className="icon-button" aria-label="Verify contact identity" aria-expanded={details} onClick={() => setDetails(!details)}><ShieldCheck className={contact.verified ? "accent" : ""} size={22} /></button></header>
     {details && <section className="verification panel"><h2>Compare in person</h2><p>Compare this safety number with {contact.name} over a trusted channel. Only mark verified when every group matches.</p><p className="safety-number mono">{safetyNumber(identity.fp, contactBytes(fp))}</p><p className="mono hint">{formatFp(contactBytes(fp))}</p><button className="secondary" onClick={() => verifyContact(fp, !contact.verified)}><ShieldCheck size={17} />{contact.verified ? "Remove verification" : "Numbers match · Mark verified"}</button></section>}
-    <div className="messages" role="log" aria-label={`Messages with ${contact.name}`} aria-live="polite">
+    <div className="messages" role="log" aria-label={`Messages with ${contact.name}`} aria-live="polite" onScroll={(event) => {
+      const log = event.currentTarget;
+      atBottom.current = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
+      if (atBottom.current) setNewMessages(false);
+    }}>
       <p className="chat-privacy"><ShieldCheck size={13} />End-to-end encrypted</p>
       {!conversation.length && <div className="empty"><MessageCircle size={32} strokeWidth={1.3} /><h2>Start with a hello</h2><p>You both need to be connected to the same mesh to exchange messages.</p></div>}
       {conversation.map((message) => <div key={message.id} className={`message ${message.outgoing ? "outgoing" : "incoming"}`}><p>{message.text}</p><div className="message-meta"><time dateTime={new Date(message.ts * 1000).toISOString()}>{new Date(message.ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</time><MessageStatus message={message} /></div></div>)}<div ref={bottom} />
     </div>
+    {newMessages && <button className="new-messages" onClick={jumpToLatest}>New messages · Jump to latest</button>}
     {error && <ErrorBanner text={error} dismiss={() => setError("")} />}
     {status !== "connected" && <div className="offline-note">Connect to a node to send and receive messages.</div>}
     {status === "connected" && permission === 0 && <div className="offline-note">This node has granted read-only access.</div>}
@@ -146,6 +175,7 @@ function App() {
   const { loaded, identity, status, error, storageError } = useMobile();
   const [tab, setTab] = useState<"chats" | "node" | "account">("chats");
   const [selected, setSelected] = useState<string | null>(null);
+  useEffect(() => { if (!identity || storageError) { setSelected(null); setTab("chats"); } }, [identity, storageError]);
   useEffect(initialize, []);
   useEffect(() => {
     const back = () => {
@@ -159,7 +189,7 @@ function App() {
   if (!loaded) return <div className="loading"><Brand /><p>Opening your encrypted account…</p></div>;
   return <div className="app-shell">
     {error && <ErrorBanner text={error} dismiss={storageError ? undefined : clearError} />}
-    {!identity ? <Welcome /> : selected ? <Conversation key={selected} fp={selected} back={() => setSelected(null)} /> : <>
+    {storageError ? <StorageRecovery /> : !identity ? <Welcome /> : selected ? <Conversation key={selected} fp={selected} back={() => setSelected(null)} /> : <>
       <header className="app-header"><div className="brand"><Brand /><span>NodeLink<small>MESHLINK FOR ANDROID</small></span></div><span className={`header-status ${status === "connected" ? "online" : ""}`}><i />{status === "connected" ? "On mesh" : status === "connecting" ? "Linking" : "Offline"}</span></header>
       <main className="page">{tab === "chats" ? <Chats select={setSelected} openNode={() => setTab("node")} /> : tab === "node" ? <NodePage /> : <AccountPage />}</main>
       <nav className="bottom-nav" aria-label="Main navigation">{([{ id: "chats", title: "Chats", Icon: MessageCircle }, { id: "node", title: "Node", Icon: Radio }, { id: "account", title: "You", Icon: UserRound }] as const).map(({ id, title, Icon }) => <button key={id} aria-current={tab === id ? "page" : undefined} onClick={() => setTab(id)}><span><Icon size={22} strokeWidth={tab === id ? 2 : 1.6} /></span>{title}</button>)}</nav>

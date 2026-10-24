@@ -51,13 +51,13 @@
     "@types/react-dom": "^19.3.0",
     "@types/w3c-web-serial": "^1.0.8",
     "@vitejs/plugin-react": "^5.2.0",
-    "electron": "^44.4.5",
+    "electron": "^44.9.3",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
-    "vite": "^7.3.6",
-    "vitest": "^3.2.7"
+    "vite": "^7.3.7",
+    "vitest": "^5.0.5"
   },
   "productName": "MeshLink",
   "build": {

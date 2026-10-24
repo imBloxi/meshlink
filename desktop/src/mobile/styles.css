@@ -705,10 +705,25 @@ p {
   margin: 7px 0 22px;
 }
 .message {
+  flex-shrink: 0;
   max-width: 86%;
   border-radius: 15px;
   padding: 10px 12px;
   word-break: break-word;
+}
+.new-messages {
+  border: 0;
+  background: #173c2f;
+  color: var(--accent);
+  min-height: 44px;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.storage-recovery>.brand-mark {
+  margin-bottom: 24px;
+}
+.storage-recovery .danger-button {
+  margin-top: 16px;
 }
 .message p {
   font-size: 14px;

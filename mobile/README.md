@@ -22,12 +22,11 @@ cd desktop
 npm ci
 npm run typecheck
 npm test
-npm run mobile:build
 cd ../mobile/android
 ./gradlew testDebugUnitTest lintDebug assembleDebug
 ```
 
-On Windows use `gradlew.bat`. The debug APK is `mobile/android/app/build/outputs/apk/debug/app-debug.apk`. It uses Android's development signing key and is not a production release. Build the web assets before each Android build; Gradle rejects missing assets, but does not rebuild stale assets for you. Dependencies are fetched from Google Maven/Maven Central on the first build.
+On Windows use `gradlew.bat`. The debug APK is `mobile/android/app/build/outputs/apk/debug/app-debug.apk`. It uses Android's development signing key and is not a production release. Gradle rebuilds the bundled web app when its mobile sources, shared core, Vite configuration or npm lockfile change, so Android Studio and command-line builds package current assets. Run `npm ci` first; Node.js and npm must be on PATH. Dependencies are fetched from Google Maven/Maven Central on the first build.
 
 To install on your own USB-debugging-enabled test phone:
 
@@ -42,6 +41,7 @@ adb shell am start -n dev.imbloxi.nodelink/.MainActivity
 
 - UI: bundled React assets loaded with AndroidX WebViewAssetLoader at its reserved HTTPS app origin. No remote navigation, frames, cookies, file access, content access, mixed content, or browser local storage. A native CSP disables all web network connections; only the native socket reaches nodes.
 - Storage: identity, contacts, settings and up to 1,000 recent messages form one AES-256-GCM encrypted snapshot. Oldest history is pruned to keep the entire encoded snapshot within 3 MiB, beneath the native 4 MiB ceiling. Long valid desktop messages remain readable after a restart. The non-exportable wrapping key lives in Android Keystore. Writes use AtomicFile; decryption or validation failure preserves the file and blocks account creation rather than replacing the identity. Hardware backing depends on the phone.
+- Recovery: a storage failure pauses the connection and offers a retry. A failed write is retried from the current in-memory account to preserve unsaved messages. Resetting requires typing `RESET` and permanently removes local contacts/history; the saved 24-word phrase can then restore the identity. If the identity is still in memory, the recovery screen lets you reveal its phrase before resetting.
 - OS: account data lives in Android's no-backup directory. Cloud backup, device transfer, screenshots and recents captures are disabled. An unlocked app can still display decrypted data. Recovery words export the identity by design; protect them.
 - Transport: explicit private IPv4 addresses only, fixed port 81, no DNS hostnames, proxies or redirects. Cleartext network traffic is allowed in the Android manifest because the ESP8266 exposes `ws://`. Message content is still encrypted by the shared core. This does not add TLS or authenticate a node to you, and a hostile hotspot can observe traffic, reject guests or deny delivery.
 - Privacy: announcements expose your display name and public identity to people on the mesh. Verify contacts independently. No analytics, cloud calls or update requests are added.
@@ -51,6 +51,8 @@ The Android shell follows the [local-content guidance](https://developer.android
 ## Current limits and verification
 
 This is an initial Android client. It supports foreground direct messages, contact discovery, delivery receipts, recovery phrases and contact verification. It does not yet support rooms, network invites, USB flashing, node administration, notifications, or background delivery. When the app backgrounds or the node connection drops, outstanding sends become failed. Reconnect manually after returning. There is no offline outbox or node mailbox; both peers need to be reachable. Contacts/history do not synchronize with your desktop installation.
+
+Guest permissions refresh every five seconds, so an admin can grant or revoke sending without requiring a reconnect. Read-only guests receive messages but cannot send delivery acknowledgements; their peers may therefore see those messages as unconfirmed.
 
 The TypeScript tests check authentication sequencing, version/guest validation, timeouts, endpoint restrictions, stored identity/contact validation, long-message restoration and history byte limits. JVM tests check native address restrictions. Instrumented tests in `android/app/src/androidTest` exercise actual Keystore storage and the packaged React WebView's onboarding, tab navigation and identity persistence across an Activity restart. CI runs them on an Android 35 emulator. Run `gradlew connectedDebugAndroidTest` with an emulator or disposable test device locally. The UI test skips existing accounts and cleans up only its own test identity; Keystore tests use unique isolated files and key aliases. These checks do not prove physical ESP8266 radio interoperability, hotspot routing with cellular enabled, or keyboard/layout behavior on every phone.
 

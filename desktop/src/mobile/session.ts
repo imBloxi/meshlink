@@ -28,6 +28,7 @@ let link: NodeLink | null = null;
 let messenger: Messenger | null = null;
 let clock: ReturnType<typeof setInterval> | null = null;
 let announce: ReturnType<typeof setInterval> | null = null;
+let infoPoll: ReturnType<typeof setInterval> | null = null;
 let generation = 0;
 const state = () => useMobile.getState();
 const set = useMobile.setState;
@@ -79,8 +80,23 @@ export function initialize() {
       set({ identity: restored.identity, name: restored.snapshot.name, host: restored.snapshot.host,
         contacts: [...contacts.values()], messages: restored.snapshot.messages });
     }
-    set({ loaded: true });
+    set({ loaded: true, storageError: false, error: "" });
   } catch (error) { set({ loaded: true, storageError: true, error: errorText(error) }); }
+}
+export function retryStorage() {
+  if (!state().storageError) return;
+  // A failed write can leave newer messages only in RAM. Never reload over them.
+  if (state().identity) {
+    try { persist(); set({ storageError: false, error: "" }); }
+    catch (error) { storageFailed(error); }
+  } else {
+    set({ loaded: false });
+    initialize();
+  }
+}
+export function resetStorage(confirmation: string) {
+  if (confirmation !== "RESET") throw new Error("Type RESET to remove the local account and history.");
+  eraseAccount();
 }
 export function createAccount(nameInput: string, phrase: string) {
   if (state().storageError) throw new Error("Resolve the storage error before creating an account.");
@@ -95,7 +111,8 @@ export function disconnect() {
   generation++;
   if (clock) clearInterval(clock);
   if (announce) clearInterval(announce);
-  clock = null; announce = null;
+  if (infoPoll) clearInterval(infoPoll);
+  clock = null; announce = null; infoPoll = null;
   const oldLink = link;
   link = null; messenger = null;
   oldLink?.close();
@@ -115,12 +132,17 @@ export async function connect(hostInput: string) {
   try {
     const host = nodeAddress(hostInput);
     set({ status: "connecting", error: "", host });
-    persist();
+    try { persist(); } catch (error) { storageFailed(error); return; }
     const session = new NodeLink(new AndroidTransport(), identity);
     link = session;
     const info = await session.open(host, (event) => {
       if (attempt !== generation) return;
       if (event.kind === "error") set({ error: event.text || "The node refused a message. Check its guest permissions or rate limit." });
+      else if (event.kind === "info") {
+        const gainedSending = state().permission === 0 && event.perm !== 0;
+        set({ permission: event.perm ?? 0 });
+        if (gainedSending) messenger?.announce();
+      }
       else if (messenger) outputs(messenger.handle(event));
     }, (reason) => {
       if (attempt !== generation) return;
@@ -128,10 +150,14 @@ export async function connect(hostInput: string) {
       set({ error: reason });
     });
     if (attempt !== generation) return;
-    messenger = new Messenger(identity, contacts, state().name, (frame) => session.send(frame), info.netId);
+    messenger = new Messenger(identity, contacts, state().name, (frame) => {
+      // Read-only guests can receive DMs, but may not send ACKs or retries.
+      if (state().permission !== 0) session.send(frame);
+    }, info.netId);
     set({ status: "connected", node: info.nodeName || `Node ${info.chipId.toString(16).toUpperCase()}`, permission: info.perm ?? 0 });
     if (info.perm !== 0) messenger.announce();
     announce = setInterval(() => { try { if (state().permission !== 0) messenger?.announce(); } catch (error) { disconnect(); set({ error: errorText(error) }); } }, 60000);
+    infoPoll = setInterval(() => { try { session.refreshInfo(); } catch (error) { disconnect(); set({ error: errorText(error) }); } }, 5000);
     clock = setInterval(() => { try { if (messenger) outputs(messenger.tick()); } catch (error) { disconnect(); set({ error: errorText(error) }); } }, 500);
   } catch (error) {
     if (attempt !== generation) return;

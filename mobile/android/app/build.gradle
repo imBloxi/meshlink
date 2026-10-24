@@ -31,7 +31,22 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-web:3.6.1'
 }
 
+def desktopDir = new File(rootProject.projectDir, '../../desktop')
+tasks.register('buildMobileWeb', Exec) {
+    workingDir desktopDir
+    inputs.files(fileTree(desktopDir) {
+        include 'src/mobile/**', 'src/core/**', 'vite.mobile.config.ts', 'package.json', 'package-lock.json'
+    })
+    outputs.dir file('src/main/assets/public')
+    if (System.getProperty('os.name').toLowerCase(Locale.ROOT).contains('windows')) {
+        commandLine 'cmd', '/c', 'npm', 'run', 'mobile:build'
+    } else {
+        commandLine 'npm', 'run', 'mobile:build'
+    }
+}
+
 tasks.register('checkWebAssets') {
+    dependsOn 'buildMobileWeb'
     doLast {
         if (!file('src/main/assets/public/index.html').isFile()) {
             throw new GradleException('Missing mobile assets. Run npm ci and npm run mobile:build from desktop/ first.')
