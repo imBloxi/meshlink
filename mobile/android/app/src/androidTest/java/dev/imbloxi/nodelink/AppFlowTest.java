@@ -16,6 +16,7 @@ import static androidx.test.espresso.Espresso.onView;
 import static androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom;
 import static androidx.test.espresso.action.ViewActions.typeTextIntoFocusedView;
 import static androidx.test.espresso.action.ViewActions.closeSoftKeyboard;
+import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.web.webdriver.DriverAtoms.*;
 import static androidx.test.espresso.web.assertion.WebViewAssertions.webMatches;
 import static org.hamcrest.Matchers.containsString;
@@ -64,6 +65,9 @@ public class AppFlowTest {
         waitForText("h1", "Stay close.");
         // WebDriver's synthetic setter can bypass React's controlled-input
         // change tracking. Exercise the same native key events as a real user.
+        // Give the native WebView focus before focusing its DOM input: a
+        // JavaScript-only click does not focus the Android view for the IME.
+        onView(isAssignableFrom(WebView.class)).perform(click());
         onWebView().withElement(findElement(Locator.ID, "name")).perform(webClick());
         onView(isAssignableFrom(WebView.class)).perform(typeTextIntoFocusedView(name), closeSoftKeyboard());
         onWebView().withElement(findElement(Locator.CSS_SELECTOR, "button[type='submit']")).perform(webClick());
