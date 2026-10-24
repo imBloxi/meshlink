@@ -4,6 +4,18 @@ All notable changes. Versions follow [semantic versioning](https://semver.org/).
 
 The desktop app and the node firmware share one version number. The app shows all versions in **Settings → About**.
 
+## [Unreleased]
+
+### Added
+- Installer with a choice of folder and of "just me" or "all users", the license, branded pages, and an option to start MeshLink when done.
+- The uninstaller asks whether to also delete your account, contacts and messages. It keeps them by default and never asks during an update.
+- MeshLink app icon for the app, installer, Start menu and taskbar.
+- Launch screen while the app loads its keys and history. It follows the system light or dark theme.
+
+### Fixed
+- The tray icon was blank on Windows (it was an SVG, which Windows cannot load there).
+- Windows grouped the taskbar button and named notifications by Electron's default app id instead of MeshLink's.
+
 ## [0.4.0] - 2026-10-23
 
 First open-source release, under GPL-3.0. Private by default.
@@ -59,6 +71,7 @@ From an internal audit before the release. Details in [SECURITY.md](SECURITY.md)
 ## [0.1.0]
 - First version: ESP8266 relay firmware, Python/tkinter app, end-to-end encrypted DMs.
 
+[Unreleased]: https://github.com/imBloxi/meshlink/compare/v0.4.0...HEAD
 [0.4.0]: https://github.com/imBloxi/meshlink/releases/tag/v0.4.0
 [0.3.0]: https://github.com/imBloxi/meshlink/releases/tag/v0.3.0
 [0.1.0]: https://github.com/imBloxi/meshlink/releases/tag/v0.1.0

@@ -6,6 +6,7 @@ import {
   app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, shell, Tray, type IpcMainEvent, type IpcMainInvokeEvent,
 } from "electron";
 import type { FirmwareManifest, MessageState, RecordKind, StoredContact, StoredMessage, UsbBridge } from "../shared/api";
+import { showSplash } from "./splash";
 import { Store } from "./store";
 import * as updates from "./updates";
 import { availableDrivers, installDrivers, UsbWatcher } from "./usb";
@@ -18,6 +19,14 @@ if (profile && /^[\w-]{1,32}$/.test(profile)) {
 }
 // --test-hooks: expose app internals on window for automated hardware tests.
 const testHooks = process.argv.includes("--test-hooks");
+// Must match build.appId: Windows uses it to group the taskbar button with the
+// Start menu shortcut and to name the app in notifications.
+if (process.platform === "win32") app.setAppUserModelId("dev.imbloxi.meshlink");
+
+/** Icons shipped next to the app: resources/icons in dev, <install>/resources/icons when packaged. */
+function iconPath(name: string) {
+  return app.isPackaged ? join(process.resourcesPath, "icons", name) : join(app.getAppPath(), "resources/icons", name);
+}
 
 let store: Store;
 let pendingSerial: ((portId: string) => void) | null = null;
@@ -28,7 +37,7 @@ let closeToTray = false;
 let quitting = false;
 const usb = new UsbWatcher((devices) => mainWindow?.webContents.send("usb:devices", devices));
 
-function createWindow() {
+function createWindow(opts: { splash?: ReturnType<typeof showSplash>; hidden?: boolean } = {}) {
   const win = new BrowserWindow({
     width: 1180,
     height: 760,
@@ -37,6 +46,7 @@ function createWindow() {
     show: false,
     backgroundColor: "#0B0F14",
     title: profile ? `MeshLink (${profile})` : "MeshLink",
+    icon: nativeImage.createFromPath(iconPath("app.png")),
     autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
@@ -47,7 +57,19 @@ function createWindow() {
   });
 
   mainWindow = win;
-  win.once("ready-to-show", () => win.show());
+  // Hand over from the launch screen. Show the window even if the page failed
+  // to load, so the user is never left with nothing on screen.
+  let shown = false;
+  const reveal = () => {
+    if (shown) return;
+    shown = true;
+    const show = () => !opts.hidden && !win.isDestroyed() && win.show();
+    if (opts.splash) opts.splash.close(show);
+    else show();
+  };
+  win.once("ready-to-show", reveal);
+  win.webContents.once("did-fail-load", reveal);
+  setTimeout(reveal, 15_000);
   win.on("closed", () => (mainWindow = null));
   // Keep running in the tray so messages keep arriving.
   win.on("close", (e) => {
@@ -210,12 +232,10 @@ function showWindow() {
   mainWindow?.focus();
 }
 
-const TRAY_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"><circle cx="8" cy="8" r="6" fill="#2EE6A6"/></svg>';
-
 function ensureTray() {
   if (tray) return;
-  const icon = nativeImage.createFromDataURL(`data:image/svg+xml;base64,${Buffer.from(TRAY_SVG).toString("base64")}`);
-  tray = new Tray(icon);
+  // PNG with a tray@2x.png sibling for 200% scaling. Windows cannot load SVG here.
+  tray = new Tray(nativeImage.createFromPath(iconPath("tray.png")));
   tray.setToolTip("MeshLink");
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: "Open MeshLink", click: showWindow },
@@ -231,12 +251,15 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   app.on("second-instance", showWindow);
   app.whenReady().then(() => {
+    // Started at login with "keep running in the tray": no splash, no window.
+    // The flag is only honoured when the tray is on (checked below).
+    const wantHidden = process.argv.includes("--hidden");
+    const splash = wantHidden ? undefined : showSplash();
     store = new Store(join(app.getPath("userData"), "data"));
     closeToTray = !!store.getSettings().closeToTray;
     registerIpc();
-    createWindow();
+    createWindow({ splash, hidden: wantHidden && closeToTray });
     if (closeToTray) ensureTray();
-    if (closeToTray && process.argv.includes("--hidden")) mainWindow?.once("ready-to-show", () => mainWindow?.hide());
     usb.start();
   });
 }

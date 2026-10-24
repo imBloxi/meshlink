@@ -72,21 +72,45 @@
       {
         "from": "resources/firmware",
         "to": "firmware"
+      },
+      {
+        "from": "resources/icons",
+        "to": "icons"
       }
     ],
     "win": {
       "target": [
         "nsis"
-      ]
+      ],
+      "icon": "build/icon.ico",
+      "executableName": "MeshLink",
+      "legalTrademarks": "MeshLink"
     },
     "nsis": {
-      "oneClick": true,
+      "oneClick": false,
       "perMachine": false,
-      "createDesktopShortcut": "always",
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "selectPerMachineByDefault": false,
+      "license": "../LICENSE",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "installerSidebar": "build/installerSidebar.bmp",
+      "uninstallerSidebar": "build/uninstallerSidebar.bmp",
+      "installerHeader": "build/installerHeader.bmp",
+      "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "MeshLink",
-      "artifactName": "MeshLink-Setup-${version}.${ext}",
-      "deleteAppDataOnUninstall": false
+      "uninstallDisplayName": "MeshLink ${version}",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "include": "build/installer.nsh",
+      "artifactName": "MeshLink-Setup-${version}.${ext}"
+    },
+    "copyright": "Copyright © 2026 imBloxi. GPL-3.0.",
+    "directories": {
+      "buildResources": "build"
     }
   },
   "repository": {
