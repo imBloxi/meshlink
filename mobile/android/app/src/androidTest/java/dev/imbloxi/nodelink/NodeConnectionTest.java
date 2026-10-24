@@ -144,23 +144,29 @@ public class NodeConnectionTest {
 
         permission.set(1);
         waitForText(".panel", "Guest access");
+        permission.set(0);
+        waitForText(".panel", "Read-only access");
+        permission.set(1);
+        waitForText(".panel", "Guest access");
         onWebView().withElement(findElement(Locator.CSS_SELECTOR, "nav button:first-child")).perform(webClick());
         onWebView().withElement(findElement(Locator.CSS_SELECTOR, ".contact-row")).perform(webClick());
         onView(isAssignableFrom(WebView.class)).perform(click());
         onWebView().withElement(findElement(Locator.ID, "message")).perform(webClick());
         String text = "Encrypted native socket message";
         onView(isAssignableFrom(WebView.class)).perform(typeTextIntoFocusedView(text), closeSoftKeyboard());
+        long sentAt = SystemClock.uptimeMillis();
         onWebView().withElement(findElement(Locator.CSS_SELECTOR, ".send-button")).perform(webClick());
         ByteString encrypted = messages.poll(5, TimeUnit.SECONDS);
         assertNotNull("Composed message must reach the node through the native Wi-Fi socket", encrypted);
         assertEquals(228, encrypted.size());
         assertFalse("Message text must not appear on the wire", encrypted.utf8().contains(text));
         waitForText(".message", text);
-        permission.set(0);
-        waitForText(".offline-note", "read-only");
+        assertEquals("sending", new JSONObject(vault.load()).getJSONArray("messages").getJSONObject(0).getString("state"));
         node.close(1000, "Fixture disconnected");
         waitForText(".offline-note", "Connect to a node");
         waitForText(".message-state", "Not delivered");
+        assertTrue("Disconnect must fail the pending message before the independent ten-second retry timeout",
+                SystemClock.uptimeMillis() - sentAt < 5000);
         assertEquals("failed", new JSONObject(vault.load()).getJSONArray("messages").getJSONObject(0).getString("state"));
     }
 }
