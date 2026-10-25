@@ -35,7 +35,7 @@ One UDP datagram carries one air frame, exactly as in PROTOCOL.md section 1: `he
 - Network: the active network (`settings.activeNetId`). The open network has an all-zero key; content stays end-to-end encrypted.
 - Send target: the directed broadcast address of each private IPv4 interface, never `255.255.255.255` (wrong adapter on Windows with VPN, WSL or Hyper-V). Adapters whose names look like a VPN, TAP/TUN, WireGuard, Tailscale, ZeroTier, Hyper-V/WSL/vEthernet, Docker, VMware, VirtualBox or Bluetooth are skipped, because a corporate VPN often has a 10.x address and would otherwise see MeshLink presence. This was added during implementation.
 - Receive: only RFC1918 source addresses.
-- Receive order, as on a node: size, magic, version, duplicate check against the tag-verified set only after the tag passes. Foreign `netId` is dropped (apps never relay). A forged frame cannot fill the duplicate set or use up an origin's rate budget.
+- Receive order, as on a node: size, magic, version, duplicate check against the tag-verified set only after the tag passes. Foreign `netId` is dropped (apps never relay). On a private network (non-zero netKey), a forged frame cannot fill the duplicate set or use up an origin's rate budget; on the open network (all-zero key) anyone can forge such frames.
 - Per-origin rate limit: 10 frames/s, the firmware default (`originRate`).
 
 ### Behaviour
