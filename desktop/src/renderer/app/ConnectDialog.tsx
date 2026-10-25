@@ -215,13 +215,16 @@ export function ConnectDialog() {
             onClick={() => setWifi(true)}
             disabled={api.platform !== "electron"}
           />
-          <ChoiceCard
-            icon={<House />}
-            title="Home Wi-Fi"
-            text={api.platform === "electron" ? "Message other MeshLink apps on your router. No boards." : "Needs the desktop app"}
-            onClick={useLan}
-            disabled={api.platform !== "electron"}
-          />
+          {settings.experimentalLan && (
+            <ChoiceCard
+              icon={<House />}
+              title="Home Wi-Fi"
+              text={api.platform === "electron" ? "Message other MeshLink apps on your router. No boards." : "Needs the desktop app"}
+              badge={<Badge>Experimental</Badge>}
+              onClick={useLan}
+              disabled={api.platform !== "electron"}
+            />
+          )}
           <ChoiceCard
             icon={<Zap />}
             title="Flash a new board"

@@ -266,9 +266,21 @@ function NetworkTab() {
 }
 
 function WifiSection() {
-  const { settings: s, updateSetting, knownNodes, forgetNode, connectWifi, conn } = useApp();
+  const { settings: s, updateSetting, knownNodes, forgetNode, connectWifi, conn, disconnect } = useApp();
   const nodes = Object.values(knownNodes);
   return (
+    <>
+    <Section title="Experimental">
+      <SwitchRow
+        title="Home Wi-Fi mode"
+        text="Adds Connect → Home Wi-Fi: message other MeshLink apps on your router with no boards. While connected, everyone on that Wi-Fi can see MeshLink is running. May change or break between versions."
+        checked={s.experimentalLan}
+        onChange={(v) => {
+          updateSetting("experimentalLan", v);
+          if (!v && conn.kind === "lan") void disconnect();
+        }}
+      />
+    </Section>
     <Section title="Wi-Fi nodes">
       <SwitchRow
         title="Connect over Wi-Fi automatically"
@@ -296,6 +308,7 @@ function WifiSection() {
         ))}
       </div>
     </Section>
+    </>
   );
 }
 

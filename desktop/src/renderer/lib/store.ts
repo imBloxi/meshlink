@@ -38,6 +38,7 @@ export interface Settings {
   launchAtLogin: boolean;
   checkUpdates: boolean; // ask GitHub for a newer release on start (off by default: no network calls)
   activeNetId: number; // network new nodes are put on
+  experimentalLan: boolean; // experimental: show Home Wi-Fi in the Connect dialog (off by default)
   lanIntro: boolean; // the home Wi-Fi privacy note has been shown
   disappear: Record<string, number>; // DM conversation -> seconds
 }
@@ -64,6 +65,7 @@ export const defaultSettings: Settings = {
   launchAtLogin: false,
   checkUpdates: false,
   activeNetId: 0,
+  experimentalLan: false,
   lanIntro: false,
   disappear: {},
 };
@@ -741,6 +743,10 @@ export const useApp = create<State>((set, get) => {
     },
 
     async connectLan() {
+      if (!get().settings.experimentalLan) {
+        get().toast({ level: "info", title: "Home Wi-Fi is experimental", body: "Turn it on in Settings → Experimental first." });
+        return false;
+      }
       const n = get().networks[netKey(get().settings.activeNetId)] ?? OPEN_NETWORK;
       return get().connect(new LanLink({ netId: n.netId, key: fromB64(n.key) }, { stealth: get().settings.stealth }));
     },

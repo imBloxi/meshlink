@@ -1,6 +1,6 @@
 # Home Wi-Fi mode
 
-Message other MeshLink apps on your router, with no boards. Choose **Connect → Home Wi-Fi**.
+**Experimental.** Message other MeshLink apps on your router, with no boards. Turn it on in **Settings → Wi-Fi nodes → Experimental**, then choose **Connect → Home Wi-Fi**. It may change or break between versions.
 
 ## How it works
 

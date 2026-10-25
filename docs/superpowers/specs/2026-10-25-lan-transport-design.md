@@ -40,6 +40,7 @@ One UDP datagram carries one air frame, exactly as in PROTOCOL.md section 1: `he
 
 ### Behaviour
 
+- Experimental: hidden behind the `experimentalLan` setting (off by default; Settings → Wi-Fi nodes → Experimental). Turning it off disconnects a live LAN link.
 - Opt-in: nothing is sent or bound until the user connects. Startup auto-connect never picks `lan`.
 - `chipId` is random per session, so a PC cannot be tracked across restarts.
 - `BEACON` every 10 s, none in stealth mode.
