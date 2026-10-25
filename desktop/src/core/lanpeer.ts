@@ -23,7 +23,7 @@ export class LanFilter {
 
   constructor(private ownOrigin: number, opts: LanFilterOptions = {}) {
     this.rate = opts.originRate ?? 10;
-    this.now = opts.now ?? Date.now;
+    this.now = opts.now ?? (() => performance.now());
     this.originsMax = opts.originsMax ?? 256;
   }
 
