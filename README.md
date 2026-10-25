@@ -55,7 +55,7 @@ Connect each board to a PC running MeshLink. The apps find each other and appear
 
 **Before you trust a contact, compare the safety number in person** (Contact → Verify). Anyone in radio range can pick any name.
 
-**No boards yet?** Turn on **Settings → Network → Experimental**, then choose **Connect → Home Wi-Fi** to message other MeshLink apps on your router. Or choose **Connect → Simulator** in two app windows.
+**No boards yet?** Turn on **Settings → Network → Home network**, then choose **Connect → Home Wi-Fi** to message other MeshLink apps on your router. Or choose **Connect → Simulator** in two app windows.
 
 ## How it works
 
@@ -91,7 +91,7 @@ MeshLink makes no network calls unless you ask, and it keeps as little as possib
 | Internet | No update checks or other requests unless you turn them on. |
 | Your Wi-Fi | The app never switches it to a node's hotspot unless you allow it. |
 | Nodes on your home network | Silent: guests and discovery work only on the node's own hotspot. |
-| Home Wi-Fi mode (experimental) | Off until you turn it on and connect. Then everyone on that Wi-Fi can see MeshLink is running, how often you send, your IP address, and your announced name and public keys. Stealth mode stops announces and beacons. |
+| Home Wi-Fi mode | Off until you turn it on and connect. Then everyone on that Wi-Fi can see MeshLink is running, how often you send, your IP address, and your announced name and public keys. Stealth mode stops announces and beacons. |
 
 The radio itself can't be hidden: someone with a receiver can see when MeshLink frames are sent, and which node sent them. [SECURITY.md](SECURITY.md) lists what MeshLink does not protect.
 

@@ -1,6 +1,6 @@
 # Home Wi-Fi mode
 
-**Experimental.** Message other MeshLink apps on your router, with no boards. Turn it on in **Settings → Network → Experimental**, then choose **Connect → Home Wi-Fi**. It may change or break between versions.
+Message other MeshLink apps on your router, with no boards. Turn it on in **Settings → Network → Home network**, then choose **Connect → Home Wi-Fi**. It is off by default and starts only when you choose Connect.
 
 ## How it works
 
@@ -28,7 +28,7 @@ The app tries to skip VPN, virtual-switch and container adapters so it does not 
 
 ## Manual test on Windows (two PCs)
 
-CI checks the portable code and real UDP on loopback. It cannot check Windows adapters or the firewall, so test these by hand before a release:
+Automated tests check the portable code and real UDP on loopback. Two-PC router, adapter-switching, VPN capture and Windows Firewall checks have not been verified for 0.6.0. Use this checklist to validate your setup:
 
 1. Put two PCs on the same home Wi-Fi. Mark the network **Private**.
 2. On both, create or join the same MeshLink network (or use the open network).

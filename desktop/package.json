@@ -1,6 +1,6 @@
 {
   "name": "meshlink-desktop",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Private off-grid mesh messenger",
   "main": "out/main/index.cjs",
   "scripts": {

@@ -270,10 +270,10 @@ function WifiSection() {
   const nodes = Object.values(knownNodes);
   return (
     <>
-    <Section title="Experimental">
+    <Section title="Home network">
       <SwitchRow
         title="Home Wi-Fi mode"
-        text="Adds Connect → Home Wi-Fi: message other MeshLink apps on your router with no boards. While connected, everyone on that Wi-Fi can see MeshLink is running. May change or break between versions."
+        text="Adds Connect → Home Wi-Fi: message other MeshLink apps on your router with no boards. While connected, everyone on that Wi-Fi can see MeshLink is running."
         checked={s.experimentalLan}
         onChange={(v) => {
           updateSetting("experimentalLan", v);

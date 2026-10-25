@@ -38,7 +38,7 @@ export interface Settings {
   launchAtLogin: boolean;
   checkUpdates: boolean; // ask GitHub for a newer release on start (off by default: no network calls)
   activeNetId: number; // network new nodes are put on
-  experimentalLan: boolean; // experimental: show Home Wi-Fi in the Connect dialog (off by default)
+  experimentalLan: boolean; // persisted key retained for compatibility; Home Wi-Fi is opt-in
   lanIntro: boolean; // the home Wi-Fi privacy note has been shown
   disappear: Record<string, number>; // DM conversation -> seconds
 }
@@ -745,7 +745,7 @@ export const useApp = create<State>((set, get) => {
 
     async connectLan() {
       if (!get().settings.experimentalLan) {
-        get().toast({ level: "info", title: "Home Wi-Fi is experimental", body: "Turn it on in Settings → Network → Experimental first." });
+        get().toast({ level: "info", title: "Home Wi-Fi is turned off", body: "Turn it on in Settings → Network → Home network first." });
         return false;
       }
       const n = get().networks[netKey(get().settings.activeNetId)] ?? OPEN_NETWORK;

@@ -1,10 +1,10 @@
 {
   "name": "MeshLink node",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "chip": "ESP8266",
   "file": "meshlink-esp8266.bin",
   "offset": 0,
   "size": 407744,
-  "sha256": "5839e33e88d57276c9cbc8a127e74fe35378c8abcd063074112aee02a4840d39",
-  "builtAt": "2026-10-24T15:56:25.317Z"
+  "sha256": "7bd113c08b13df1ff1f85129eeec29d4d023777fc4ed32550ca6e43819cff465",
+  "builtAt": "2026-10-25T18:12:53.797Z"
 }
