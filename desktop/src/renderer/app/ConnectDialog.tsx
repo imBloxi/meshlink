@@ -176,8 +176,8 @@ export function ConnectDialog() {
     <Dialog
       open={open}
       onOpenChange={(o) => (o ? setPanel("connect", true) : close())}
-      title={ports ? "Choose a port" : "Connect a node"}
-      description={ports ? "Pick the COM port of your MeshLink ESP8266." : "The app talks to the mesh through a MeshLink node."}
+      title={ports ? "Choose a port" : lanPane ? "Home Wi-Fi" : "Connect a node"}
+      description={ports ? "Pick the COM port of your MeshLink ESP8266." : lanPane ? "Message other MeshLink apps on your router. No node needed." : "The app talks to the mesh through a MeshLink node."}
     >
       {ports ? (
         <PortList ports={ports} onChoose={choose} onBack={cancel} />

@@ -35,18 +35,38 @@ export function broadcastOf(address: string, netmask: string): string | null {
 // has a 10.x address, and broadcasting there would show MeshLink to that network.
 const VIRTUAL = /vpn|\btap\b|tap-|\btun\d*\b|tun\d|wireguard|\bwg\d|tailscale|zerotier|ham?achi|vethernet|hyper-v|wsl|docker|veth|br-|virtual|vmware|vmnet|vbox|bluetooth|loopback|pseudo/i;
 
-/** One directed broadcast address per real private adapter. */
-export function broadcastTargets(ifaces: NodeJS.Dict<NetworkInterfaceInfo[]> = networkInterfaces()): string[] {
-  const out = new Set<string>();
+/** A subnet we talk on: where to broadcast, and which source addresses belong to it. */
+export interface Adapter {
+  broadcast: string;
+  net: number;
+  mask: number;
+}
+
+/** One entry per real private subnet. Sending and receiving both use this list. */
+export function privateAdapters(ifaces: NodeJS.Dict<NetworkInterfaceInfo[]> = networkInterfaces()): Adapter[] {
+  const out = new Map<string, Adapter>();
   for (const [name, list] of Object.entries(ifaces)) {
     if (VIRTUAL.test(name)) continue;
     for (const i of list ?? []) {
       if (i.family !== "IPv4" || i.internal || !isPrivateV4(i.address)) continue;
       const b = broadcastOf(i.address, i.netmask);
-      if (b) out.add(b);
+      const a = toInt(i.address);
+      const m = toInt(i.netmask);
+      if (b && a !== null && m !== null) out.set(b, { broadcast: b, net: (a & m) >>> 0, mask: m });
     }
   }
-  return [...out];
+  return [...out.values()];
+}
+
+/** One directed broadcast address per real private adapter. */
+export function broadcastTargets(ifaces: NodeJS.Dict<NetworkInterfaceInfo[]> = networkInterfaces()): string[] {
+  return privateAdapters(ifaces).map((a) => a.broadcast);
+}
+
+/** True when the address is on the subnet of one of the adapters. */
+export function inSubnets(address: string, subnets: Pick<Adapter, "net" | "mask">[]): boolean {
+  const a = toInt(address);
+  return a !== null && subnets.some((s) => ((a & s.mask) >>> 0) === s.net);
 }
 
 export interface UdpLanOptions {
@@ -54,7 +74,9 @@ export interface UdpLanOptions {
   /** Where datagrams go. Tests point this at a second socket. */
   sendPort?: number;
   targets?: () => string[];
-  /** Which source addresses we listen to. */
+  /** Subnets whose sources we listen to. Defaults to the real private adapters, the same ones we send on. */
+  subnets?: () => Pick<Adapter, "net" | "mask">[];
+  /** Overrides the subnet rule. Tests only. */
   accept?: (address: string) => boolean;
   rescanMs?: number;
 }
@@ -62,6 +84,7 @@ export interface UdpLanOptions {
 export class UdpLan {
   private sock: Socket | null = null;
   private targets: string[] = [];
+  private subnets: Pick<Adapter, "net" | "mask">[] = [];
   private rescan: ReturnType<typeof setInterval> | null = null;
   private readonly port: number;
   private readonly sendPort: number;
@@ -73,11 +96,13 @@ export class UdpLan {
   }
 
   async open(onDatagram: (d: Uint8Array) => void, onClosed: (reason: string) => void): Promise<void> {
-    const targets = (this.opts.targets ?? broadcastTargets)();
-    if (!targets.length) throw new Error("Connect to your home Wi-Fi or Ethernet first.");
-    this.targets = targets;
+    const scan = this.scan();
+    if (!scan.targets.length) throw new Error("Connect to your home Wi-Fi or Ethernet first.");
+    this.targets = scan.targets;
+    this.subnets = scan.subnets;
     const gen = ++this.gen;
-    const accept = this.opts.accept ?? isPrivateV4;
+    // A source must be on the subnet of a real adapter: not another private subnet, not a VPN.
+    const accept = this.opts.accept ?? ((address: string) => inSubnets(address, this.subnets));
     // No reuseAddr: a second copy must fail to bind, not share the port and split the datagrams.
     const sock = createSocket({ type: "udp4" });
     await new Promise<void>((resolve, reject) => {
@@ -108,10 +133,19 @@ export class UdpLan {
     sock.on("error", (e) => this.fail(onClosed, `Network error: ${e.message}`));
     this.sock = sock;
     this.rescan = setInterval(() => {
-      const now = (this.opts.targets ?? broadcastTargets)();
-      if (!now.length) return this.fail(onClosed, "The home network connection was lost.");
-      this.targets = now;
+      const now = this.scan();
+      if (!now.targets.length) return this.fail(onClosed, "The home network connection was lost.");
+      this.targets = now.targets;
+      this.subnets = now.subnets;
     }, this.opts.rescanMs ?? 30_000);
+  }
+
+  private scan(): { targets: string[]; subnets: Pick<Adapter, "net" | "mask">[] } {
+    const adapters = this.opts.targets && this.opts.subnets ? [] : privateAdapters();
+    return {
+      targets: this.opts.targets ? this.opts.targets() : adapters.map((a) => a.broadcast),
+      subnets: this.opts.subnets ? this.opts.subnets() : this.opts.targets ? [] : adapters,
+    };
   }
 
   send(d: Uint8Array): void {

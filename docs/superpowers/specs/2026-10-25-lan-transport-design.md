@@ -34,7 +34,7 @@ One UDP datagram carries one air frame, exactly as in PROTOCOL.md section 1: `he
 - No relaying. One broadcast reaches the whole LAN.
 - Network: the active network (`settings.activeNetId`). The open network has an all-zero key; content stays end-to-end encrypted.
 - Send target: the directed broadcast address of each private IPv4 interface, never `255.255.255.255` (wrong adapter on Windows with VPN, WSL or Hyper-V). Adapters whose names look like a VPN, TAP/TUN, WireGuard, Tailscale, ZeroTier, Hyper-V/WSL/vEthernet, Docker, VMware, VirtualBox or Bluetooth are skipped, because a corporate VPN often has a 10.x address and would otherwise see MeshLink presence. This was added during implementation.
-- Receive: only RFC1918 source addresses.
+- Receive: only sources on the subnet of a real private adapter (the same list used to send), not another private subnet and not a VPN or virtual adapter.
 - Receive order, as on a node: size, magic, version, zero `msgId`, `netId` (foreign is dropped; apps never relay), tag (dropped before any state changes), then own-echo, the duplicate check and the per-origin rate limit. On a private network (non-zero netKey), a forged frame cannot fill the duplicate set or use up an origin's rate budget; on the open network (all-zero key) anyone can forge such frames.
 - Per-origin rate limit: the firmware's token bucket (`originAllowed`): 10 frames/s with a burst of two seconds (20 frames), on a monotonic clock. A message of more than about 20 chunks (3.4 KB) is also dropped by nodes on the radio.
 - One copy of MeshLink per PC: the socket does not set `reuseAddr`, so a second copy fails with a clear port message instead of splitting datagrams.
@@ -43,7 +43,7 @@ One UDP datagram carries one air frame, exactly as in PROTOCOL.md section 1: `he
 
 - Experimental: hidden behind the `experimentalLan` setting (off by default; Settings → Network → Experimental). Turning it off disconnects a live LAN link.
 - Opt-in: nothing is sent or bound until the user connects. Startup auto-connect never picks `lan`.
-- `chipId` is random per session, so a PC cannot be tracked across restarts.
+- `chipId` is random per session, so the air header alone does not link a PC across restarts. Announces (outside stealth mode) expose the stable public keys and display name, and the sender's IP address is visible on the LAN, so the PC is still linkable.
 - `BEACON` every 10 s, none in stealth mode.
 - First-use text: everyone on this Wi-Fi can see that MeshLink runs, how often you send and your announced name (stealth hides announces); messages stay encrypted. Shown once (`lanIntro` setting).
 

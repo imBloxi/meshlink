@@ -140,7 +140,8 @@ export interface MeshlinkApi {
   discoverNodes(timeoutMs: number): Promise<DiscoveredNode[]>;
   /**
    * Home Wi-Fi transport: air-frame datagrams over UDP on the local subnet.
-   * One session at a time. Opening fails with a message the user can act on.
+   * One session at a time: opening again closes the previous session without telling it.
+   * Opening fails with a message the user can act on.
    */
   lanOpen(): Promise<{ ok: true } | { ok: false; message: string }>;
   lanSend(datagram: Uint8Array): void;

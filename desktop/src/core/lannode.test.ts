@@ -21,7 +21,7 @@ class Hub {
     return port;
   }
   inject(d: Uint8Array) {
-    for (const x of this.ports) x.onDatagram?.(d);
+    for (const x of this.ports) if (!x.closed) x.onDatagram?.(d);
   }
 }
 class HubPort implements LanTransport {

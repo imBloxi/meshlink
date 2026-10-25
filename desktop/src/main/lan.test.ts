@@ -1,7 +1,7 @@
 import { createSocket } from "node:dgram";
 import type { NetworkInterfaceInfo } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
-import { broadcastTargets, broadcastOf, isPrivateV4, UdpLan } from "./lan";
+import { broadcastTargets, broadcastOf, inSubnets, isPrivateV4, privateAdapters, UdpLan } from "./lan";
 
 const v4 = (address: string, netmask: string, internal = false): NetworkInterfaceInfo =>
   ({ address, netmask, family: "IPv4", internal, mac: "", cidr: null }) as NetworkInterfaceInfo;
@@ -45,6 +45,21 @@ describe("addresses", () => {
       "VirtualBox Host-Only": [v4("192.168.56.1", "255.255.255.0")],
     };
     expect(broadcastTargets(ifaces)).toEqual(["192.168.0.255"]);
+    // Receiving follows the same list: nothing from a VPN or virtual subnet is accepted either.
+    const real = privateAdapters(ifaces);
+    expect(inSubnets("192.168.0.77", real)).toBe(true);
+    expect(inSubnets("10.8.0.5", real)).toBe(false);
+    expect(inSubnets("172.20.0.9", real)).toBe(false);
+  });
+
+  it("accepts only sources on the subnet of a real adapter", () => {
+    const real = privateAdapters({ "Wi-Fi": [v4("192.168.1.23", "255.255.255.0")], Wired: [v4("10.0.4.2", "255.255.252.0")] });
+    expect(inSubnets("192.168.1.99", real)).toBe(true);
+    expect(inSubnets("192.168.2.99", real)).toBe(false); // private, but another subnet
+    expect(inSubnets("10.0.7.1", real)).toBe(true); // /22 reaches 10.0.4.0 to 10.0.7.255
+    expect(inSubnets("10.0.8.1", real)).toBe(false);
+    expect(inSubnets("8.8.8.8", real)).toBe(false);
+    expect(inSubnets("nonsense", real)).toBe(false);
   });
 });
 
@@ -99,6 +114,26 @@ describe("UdpLan", () => {
     a.send(Uint8Array.of(9));
     await new Promise((r) => setTimeout(r, 150));
     expect(got).toEqual([]);
+  });
+
+  it("by default listens only to sources on the subnets it is given", async () => {
+    const loopback = [{ broadcast: "127.255.255.255", net: 0x7f000000, mask: 0xff000000 }];
+    const other = [{ broadcast: "10.255.255.255", net: 0x0a000000, mask: 0xff000000 }];
+    const heard = async (subnets: typeof loopback) => {
+      const got: number[] = [];
+      const a = lan(PORT_A, PORT_B);
+      const b = new UdpLan({ port: PORT_B, sendPort: PORT_A, targets: () => ["127.0.0.1"], subnets: () => subnets });
+      open.push(b);
+      await a.open(() => {}, () => {});
+      await b.open((d) => got.push(d.length), () => {});
+      a.send(Uint8Array.of(7));
+      await new Promise((r) => setTimeout(r, 150));
+      a.close();
+      b.close();
+      return got;
+    };
+    expect(await heard(loopback)).toEqual([1]);
+    expect(await heard(other)).toEqual([]);
   });
 
   it("refuses to open with no home network", async () => {

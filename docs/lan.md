@@ -10,7 +10,7 @@ It does not reach other subnets, other houses or the internet. For that you stil
 
 ## What it shows your Wi-Fi
 
-Everyone on the same Wi-Fi can see that MeshLink is running, how often you send, and a random id for each session. Your announces carry your display name and public keys in clear, as on the radio, so they can see those too, and the keys link you across restarts. They cannot read messages. Stealth mode stops beacons and automatic announces, not messages.
+Everyone on the same Wi-Fi can see that MeshLink is running, how often you send, the IP address of your PC, and a random id for each session. Your announces carry your display name and public keys in clear, as on the radio, so they can see those too, and the keys link you across restarts. They cannot read messages. Stealth mode stops beacons and automatic announces, not messages.
 
 The app tries to skip VPN, virtual-switch and container adapters so it does not announce itself into those networks. It decides by the adapter's name (for example "VPN", "TAP", "WireGuard", "Tailscale", "vEthernet"), because the system gives no reliable adapter type. A VPN adapter with an ordinary name is not detected, so do not rely on this when a VPN is connected: check step 8 below, or turn Home Wi-Fi off. Read [privacy.md](privacy.md) before you use it on a Wi-Fi you do not trust.
 

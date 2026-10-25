@@ -25,7 +25,7 @@ ESP-NOW broadcast on the network's channel (default 6). A frame has at most 250 
 | Offset | Size | Field | Notes |
 |-------:|-----:|-------|-------|
 | 0 | 1 | magic | `0x4D` (`M`) |
-| 1 | 1 | version | `2` |
+| 1 | 1 | version | `3` |
 | 2 | 1 | type | `0x01` BEACON, `0x02` DM, `0x03` ANNOUNCE, `0x04` ROOM, `0x06` POLICY |
 | 3 | 1 | ttl | Relays left. Default 3, max 7. BEACON uses 0. |
 | 4 | 4 | msgId | Random, never 0. Used for duplicate detection. |
@@ -126,7 +126,7 @@ UDP port 4210. Request `"MLDISCOVER"`. Answer `"MLNODE" chipId(4) netId(4) nameL
 Apps on the same home network can exchange air frames directly, with no node. The app acts as a guest-only node toward itself: it builds and checks the same air frames as section 1 and hands the same `RECV`, `SENT` and `INFO` events to the rest of the app.
 
 - **Transport.** One UDP datagram on port **4211** carries one air frame (`header 17 + body ≤ 225 + tag 8`). Port 4210 stays reserved for node discovery.
-- **Addressing.** The app sends to the directed broadcast address of each private IPv4 adapter (for example `192.168.1.255`). It skips adapters that look like a VPN, a virtual switch or a container, so MeshLink does not announce itself into those networks. It listens on all adapters and accepts only RFC1918 source addresses.
+- **Addressing.** The app sends to the directed broadcast address of each private IPv4 adapter (for example `192.168.1.255`). It skips adapters that look like a VPN, a virtual switch or a container, so MeshLink does not announce itself into those networks (it tells them apart by name, so a VPN with an ordinary name is not detected). It accepts a datagram only if its source address is on the subnet of one of those same adapters: not another private subnet and not a VPN. Anyone on the LAN can see the IP address of each sender.
 - **Tag.** The same keyed tag as on the radio, `BLAKE2s-64(key = netKey, frame without tag, ttl = 0)`, with the network chosen in the app (`netId 0` is the open network with an all-zero key).
 - **TTL.** Senders write `ttl = 0`. Nothing relays on a LAN, because one broadcast reaches every app. The tag excludes the TTL, so a node that later bridges the LAN to ESP-NOW can set its own.
 - **Receive rules**, in the order of section 1: wrong size, magic, version or a zero `msgId` is dropped; another `netId` is dropped (apps never relay); a bad tag is dropped **before** any state changes (on the open network the key is all zeros, so anyone can make a valid tag); then own frames (the socket hears its own broadcast), duplicates (last 512 `msgId`s) and origins over the rate limit: the firmware's token bucket, 10 frames per second with a burst of two seconds.
