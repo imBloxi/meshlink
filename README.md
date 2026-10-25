@@ -55,7 +55,7 @@ Connect each board to a PC running MeshLink. The apps find each other and appear
 
 **Before you trust a contact, compare the safety number in person** (Contact → Verify). Anyone in radio range can pick any name.
 
-**No boards yet?** Choose **Connect → Home Wi-Fi** to message other MeshLink apps on your router, or **Connect → Simulator** in two app windows.
+**No boards yet?** Turn on **Settings → Network → Experimental**, then choose **Connect → Home Wi-Fi** to message other MeshLink apps on your router. Or choose **Connect → Simulator** in two app windows.
 
 ## How it works
 

@@ -65,6 +65,7 @@ export class UdpLan {
   private rescan: ReturnType<typeof setInterval> | null = null;
   private readonly port: number;
   private readonly sendPort: number;
+  private gen = 0; // bumped by every open() and close(), so an open that lost the race can tell
 
   constructor(private opts: UdpLanOptions = {}) {
     this.port = opts.port ?? LAN_PORT;
@@ -75,10 +76,12 @@ export class UdpLan {
     const targets = (this.opts.targets ?? broadcastTargets)();
     if (!targets.length) throw new Error("Connect to your home Wi-Fi or Ethernet first.");
     this.targets = targets;
+    const gen = ++this.gen;
     const accept = this.opts.accept ?? isPrivateV4;
-    const sock = createSocket({ type: "udp4", reuseAddr: true });
+    // No reuseAddr: a second copy must fail to bind, not share the port and split the datagrams.
+    const sock = createSocket({ type: "udp4" });
     await new Promise<void>((resolve, reject) => {
-      sock.once("error", (e: NodeJS.ErrnoException) => {
+      const failed = (e: NodeJS.ErrnoException) => {
         sock.close();
         reject(new Error(
           e.code === "EADDRINUSE" ? `Port ${this.port} is in use by another program.`
@@ -86,9 +89,18 @@ export class UdpLan {
             : e.code === "EACCES" ? `Could not listen on port ${this.port}. It is in use by another program (or a second copy of MeshLink), or Windows is blocking MeshLink. Close the other program and allow MeshLink for Private networks in the firewall.`
               : `Could not listen on the home network: ${e.message}`,
         ));
+      };
+      sock.once("error", failed);
+      sock.bind(this.port, "0.0.0.0", () => {
+        sock.off("error", failed);
+        resolve();
       });
-      sock.bind(this.port, "0.0.0.0", resolve);
     });
+    if (gen !== this.gen) {
+      // close() ran while we were binding. Do not install a socket nobody will close.
+      sock.close();
+      throw new Error("Cancelled.");
+    }
     sock.setBroadcast(true);
     sock.on("message", (msg, rinfo) => {
       if (this.sock === sock && accept(rinfo.address)) onDatagram(new Uint8Array(msg.buffer, msg.byteOffset, msg.byteLength));
@@ -109,6 +121,7 @@ export class UdpLan {
   }
 
   close(): void {
+    this.gen++;
     if (this.rescan) clearInterval(this.rescan);
     this.rescan = null;
     const sock = this.sock;

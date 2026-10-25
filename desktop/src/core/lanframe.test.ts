@@ -45,6 +45,15 @@ describe("lanframe", () => {
     expect(r.ok && r.frame.ttl).toBe(5);
   });
 
+  it("refuses header fields that do not fit, instead of truncating them", () => {
+    const bad: Partial<AirFrame>[] = [
+      { msgId: 0 }, { msgId: 2 ** 32 }, { msgId: 1.5 }, { origin: -1 }, { origin: 2 ** 32 },
+      { netId: 2 ** 32 }, { netId: -1 }, { type: 256 }, { flags: -1 }, { flags: 256 },
+    ];
+    for (const over of bad) expect(() => buildAirFrame({ ...GOLDEN, ...over }, KEY), JSON.stringify(over)).toThrow(/out of range/);
+    expect(() => buildAirFrame({ ...GOLDEN, origin: 0, netId: 0 }, KEY)).not.toThrow(); // the open network and origin 0 are fine
+  });
+
   it("rejects a body that does not fit", () => {
     expect(() => buildAirFrame({ ...GOLDEN, body: new Uint8Array(p.MAX_BODY + 1) }, KEY)).toThrow();
   });

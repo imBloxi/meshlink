@@ -7,7 +7,7 @@ The desktop app and the node firmware share one version number. The app shows al
 ## [Unreleased]
 
 ### Added
-- **Home Wi-Fi mode (experimental, off by default).** Turn it on in **Settings → Wi-Fi nodes → Experimental**, then choose **Connect → Home Wi-Fi** to message other MeshLink apps on the same router, with no boards. It sends the radio's air frames over UDP port 4211 with the same keyed network tag, on the network you picked in the app. It is off until you choose it, sends no beacons in stealth mode, skips VPN and virtual adapters, and uses a random id for each session. Desktop only for now. See [docs/lan.md](docs/lan.md) and PROTOCOL.md section 2.6.
+- **Home Wi-Fi mode (experimental, off by default).** Turn it on in **Settings → Network → Experimental**, then choose **Connect → Home Wi-Fi** to message other MeshLink apps on the same router, with no boards. It sends the radio's air frames over UDP port 4211 with the same keyed network tag, on the network you picked in the app. **While it is on, everyone on that Wi-Fi can see that MeshLink is running, how often you send, and your announced name and public keys** (stealth mode stops beacons and automatic announces, not messages). Messages stay end-to-end encrypted. It is off until you choose it, tries to skip VPN and virtual adapters by their names (a VPN with an ordinary name is not detected), and uses a random id for each session. One copy of MeshLink per PC can use it. Desktop only for now. See [docs/lan.md](docs/lan.md) and PROTOCOL.md section 2.6.
 - The air protocol (v3) and the firmware are unchanged. A future node can bridge the LAN to the radio without translating frames.
 
 ## [0.5.1] - 2026-10-24

@@ -185,13 +185,16 @@ describe("LanNode", () => {
       const hub = new Hub();
       const a = await peer(hub, "alice", { originRate: 3 });
       for (let i = 1; i <= 10; i++) hub.inject(frameFor({ msgId: i }));
-      expect(recvs(a)).toHaveLength(3);
+      expect(recvs(a)).toHaveLength(6); // a burst of two seconds, as on a node
+      expect(a.node.drops.rate).toBe(4);
     });
 
     it("does not hear itself when the socket loops broadcasts back", async () => {
       const hub = new Hub(true);
       const a = await peer(hub, "alice");
+      const before = a.node.drops.echo ?? 0;
       a.m.announce();
+      expect(a.node.drops.echo).toBe(before + 1); // it was heard, and filtered as our own
       expect(recvs(a).filter((e) => e.kind === "recv" && e.airType === p.AIR_ANNOUNCE)).toHaveLength(0);
     });
   });
@@ -227,6 +230,71 @@ describe("LanNode", () => {
       await peer(hub, "bob"); // its first beacon reaches alice
       vi.advanceTimersByTime(25_000);
       expect(a.notices).toHaveLength(0);
+    });
+  });
+
+  describe("stealth", () => {
+    const beaconsBy = (hub: Hub, x: Peer) => hub.sent.filter((d) => d[2] === p.AIR_BEACON && new DataView(d.buffer, d.byteOffset).getUint32(8, true) === x.node.chipId).length;
+
+    it("follows the setting while connected", async () => {
+      const hub = new Hub();
+      const a = await peer(hub, "alice");
+      expect(beaconsBy(hub, a)).toBe(1);
+      a.node.setStealth(true);
+      vi.advanceTimersByTime(60_000);
+      expect(beaconsBy(hub, a)).toBe(1); // nothing more
+      a.node.setStealth(false);
+      expect(beaconsBy(hub, a)).toBe(2); // one at once, so neighbours see us again
+      vi.advanceTimersByTime(20_000);
+      expect(beaconsBy(hub, a)).toBe(4);
+      a.node.setStealth(false); // no second timer
+      vi.advanceTimersByTime(10_000);
+      expect(beaconsBy(hub, a)).toBe(5);
+    });
+
+    it("turning stealth off on a closed node sends nothing", async () => {
+      const hub = new Hub();
+      const a = await peer(hub, "alice", { stealth: true });
+      a.node.close();
+      a.node.setStealth(false);
+      vi.advanceTimersByTime(30_000);
+      expect(hub.sent).toHaveLength(0);
+    });
+  });
+
+  describe("closing while opening", () => {
+    const slowTransport = () => {
+      const t = {
+        sent: [] as Uint8Array[],
+        release: () => {},
+        fail: (_e: Error) => {},
+        open: () => new Promise<void>((res, rej) => { t.release = res; t.fail = rej; }),
+        send(d: Uint8Array) { t.sent.push(d); },
+        close() {},
+      };
+      return t;
+    };
+
+    it("stays down: no beacons, no info, no warning", async () => {
+      const t = slowTransport();
+      const node = new LanNode(t, NET);
+      const seen: unknown[] = [];
+      const opening = node.open({ onEvent: (e) => seen.push(e), onClose: (r) => seen.push(r), onNotice: (n) => seen.push(n) });
+      node.close();
+      t.release();
+      await opening;
+      vi.advanceTimersByTime(60_000);
+      expect(t.sent).toEqual([]);
+      expect(seen).toEqual([]);
+    });
+
+    it("does not report a failure to a caller that already gave up", async () => {
+      const t = slowTransport();
+      const node = new LanNode(t, NET);
+      const opening = node.open({ onEvent() {}, onClose() {} });
+      node.close();
+      t.fail(new Error("Cancelled"));
+      await expect(opening).resolves.toBeUndefined();
     });
   });
 

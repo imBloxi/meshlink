@@ -116,6 +116,21 @@ describe("UdpLan", () => {
     }
   });
 
+  it("does not share its port with a second copy", async () => {
+    await lan(PORT_A, PORT_B).open(() => {}, () => {});
+    await expect(lan(PORT_A, PORT_B).open(() => {}, () => {})).rejects.toThrow(/port 47311/i);
+  });
+
+  it("leaves nothing listening when close() lands while it is still binding", async () => {
+    const a = lan(PORT_A, PORT_B);
+    const opening = a.open(() => {}, () => {});
+    a.close(); // a reload or window close at this moment
+    await expect(opening).rejects.toThrow(/cancel/i);
+    const probe = createSocket("udp4");
+    await new Promise<void>((res, rej) => { probe.once("error", rej); probe.bind(PORT_A, "0.0.0.0", res); });
+    probe.close();
+  });
+
   it("closes with a reason when the last adapter goes away", async () => {
     let up = true;
     const reasons: string[] = [];

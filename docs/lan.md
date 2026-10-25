@@ -1,6 +1,6 @@
 # Home Wi-Fi mode
 
-**Experimental.** Message other MeshLink apps on your router, with no boards. Turn it on in **Settings → Wi-Fi nodes → Experimental**, then choose **Connect → Home Wi-Fi**. It may change or break between versions.
+**Experimental.** Message other MeshLink apps on your router, with no boards. Turn it on in **Settings → Network → Experimental**, then choose **Connect → Home Wi-Fi**. It may change or break between versions.
 
 ## How it works
 
@@ -10,13 +10,16 @@ It does not reach other subnets, other houses or the internet. For that you stil
 
 ## What it shows your Wi-Fi
 
-Everyone on the same Wi-Fi can see that MeshLink is running, how often you send, and a random id for each session. Your announces carry your display name and public keys in clear, as on the radio, so they can see those too. They cannot read messages. Stealth mode stops beacons and automatic announces. The app skips VPN, virtual-switch and container adapters so it does not announce itself into those networks. Read [privacy.md](privacy.md) before you use it on a Wi-Fi you do not trust.
+Everyone on the same Wi-Fi can see that MeshLink is running, how often you send, and a random id for each session. Your announces carry your display name and public keys in clear, as on the radio, so they can see those too, and the keys link you across restarts. They cannot read messages. Stealth mode stops beacons and automatic announces, not messages.
+
+The app tries to skip VPN, virtual-switch and container adapters so it does not announce itself into those networks. It decides by the adapter's name (for example "VPN", "TAP", "WireGuard", "Tailscale", "vEthernet"), because the system gives no reliable adapter type. A VPN adapter with an ordinary name is not detected, so do not rely on this when a VPN is connected: check step 8 below, or turn Home Wi-Fi off. Read [privacy.md](privacy.md) before you use it on a Wi-Fi you do not trust.
 
 ## Troubleshooting
 
 | Symptom | Likely cause |
 |---|---|
 | "Connect to your home Wi-Fi or Ethernet first." | The PC has no private IPv4 address on a real adapter. |
+| Only one MeshLink per PC can use it | The port is not shared. A second copy fails with "Could not listen on port 4211" (below). |
 | "Could not listen on port 4211" / "Port 4211 is in use" | Another program uses the port, often a second copy of MeshLink. Windows also reports this when its firewall blocks MeshLink: allow it on Private networks. |
 | "No one else on this Wi-Fi yet" | The other app is not in Home Wi-Fi mode, uses a different MeshLink network, or the router blocks it. |
 | Works over Ethernet, not Wi-Fi | The router isolates Wi-Fi clients (called AP isolation or client isolation). Guest networks do this by default. |

@@ -485,7 +485,7 @@ export const useApp = create<State>((set, get) => {
     const fresh = usable.find((d) => !autoFailed.has(d.com!) && (!before.has(d.id) || d.com !== lastAutoCom));
     const c = get().conn;
     // A USB board beats Wi-Fi: it makes this app the node's admin.
-    const canTake = c.status === "disconnected" || (c.kind === "wifi" && c.status === "connected");
+    const canTake = c.status === "disconnected" || ((c.kind === "wifi" || c.kind === "lan") && c.status === "connected");
     if (fresh && s.autoConnect && canTake && !get().panels.flasher && get().identity) {
       lastAutoCom = fresh.com;
       get().connectCom(fresh.com!, true);
@@ -670,6 +670,7 @@ export const useApp = create<State>((set, get) => {
       api.setSetting(key, value);
       if (key === "name" && messenger) messenger.name = value as string;
       if (key === "stealth" || key === "announceInterval") scheduleAnnounce();
+      if (key === "stealth" && link instanceof LanLink) link.setStealth(value as boolean);
       if (key === "closeToTray") api.setCloseToTray(value as boolean);
       if (key === "launchAtLogin") api.setLaunchAtLogin(value as boolean);
       if (key === "notifyNative" && value && "Notification" in window) Notification.requestPermission().catch(() => {});
@@ -744,7 +745,7 @@ export const useApp = create<State>((set, get) => {
 
     async connectLan() {
       if (!get().settings.experimentalLan) {
-        get().toast({ level: "info", title: "Home Wi-Fi is experimental", body: "Turn it on in Settings → Experimental first." });
+        get().toast({ level: "info", title: "Home Wi-Fi is experimental", body: "Turn it on in Settings → Network → Experimental first." });
         return false;
       }
       const n = get().networks[netKey(get().settings.activeNetId)] ?? OPEN_NETWORK;

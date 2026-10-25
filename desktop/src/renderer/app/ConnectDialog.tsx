@@ -25,7 +25,7 @@ function LanPane({ onDone, onBack }: { onDone: () => void; onBack: () => void })
       </p>
       <ul className="list-disc pl-5 space-y-1 text-muted">
         <li>Messages stay end-to-end encrypted, as on the radio.</li>
-        <li>Everyone on this Wi-Fi can see that MeshLink is running, how often you send, and your announced name. Stealth mode hides the announces.</li>
+        <li>Everyone on this Wi-Fi can see that MeshLink is running, how often you send, and your announced name and public keys. Stealth mode stops beacons and automatic announces.</li>
         <li>It works only on one home network. Guest Wi-Fi and some routers block it.</li>
         <li>Windows may ask to allow MeshLink through the firewall. Allow it for Private networks.</li>
       </ul>

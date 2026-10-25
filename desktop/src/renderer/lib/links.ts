@@ -257,6 +257,11 @@ export class LanLink implements Link {
     return this.node.open(h);
   }
 
+  /** Stealth changed while connected: start or stop beacons at once. */
+  setStealth(on: boolean) {
+    this.node.setStealth(on);
+  }
+
   async send(frame: Uint8Array) {
     this.node.send(frame);
   }

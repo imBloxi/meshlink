@@ -32,6 +32,11 @@ function tagOf(netKey: Uint8Array, frameNoTag: Uint8Array): Uint8Array {
 /** A datagram for the LAN: header, body and tag. The TTL is sent as 0; nothing relays on a LAN. */
 export function buildAirFrame(f: AirFrame, netKey: Uint8Array): Uint8Array {
   if (f.body.length > MAX_BODY) throw new Error(`Frame body is ${f.body.length} bytes; the limit is ${MAX_BODY}.`);
+  const fits = (v: number, max: number) => Number.isInteger(v) && v >= 0 && v <= max;
+  // A header field that does not fit would be cut short by the byte writer, and a zero msgId is always dropped.
+  if (!fits(f.type, 0xff) || !fits(f.flags, 0xff) || !fits(f.msgId, 0xffffffff) || f.msgId === 0 || !fits(f.origin, 0xffffffff) || !fits(f.netId, 0xffffffff)) {
+    throw new Error("Frame header field out of range.");
+  }
   const header = concat(
     Uint8Array.of(MAGIC, VERSION, f.type, 0),
     u32le(f.msgId), u32le(f.origin), u32le(f.netId),

@@ -45,7 +45,7 @@ export class LanNode {
   /** Random per session, so the LAN cannot follow one PC across restarts. */
   readonly chipId = randomU32();
   readonly drops: LanDrops = {};
-  private readonly peers = new Set<number>();
+  private heardPeer = false; // a flag, not a set: any sender could otherwise grow it without bound
   private readonly filter: LanFilter;
   private handlers: LanHandlers | null = null;
   private beacon: ReturnType<typeof setInterval> | null = null;
@@ -58,15 +58,20 @@ export class LanNode {
 
   async open(h: LanHandlers): Promise<void> {
     this.handlers = h;
-    await this.transport.open((d) => this.receive(d), (reason) => this.lost(reason));
+    try {
+      await this.transport.open((d) => this.receive(d), (reason) => this.lost(reason));
+    } catch (e) {
+      // close() during the wait already gave up on this call: nobody is listening for the failure.
+      if (this.handlers !== h) return;
+      this.handlers = null;
+      throw e;
+    }
+    if (this.handlers !== h) return; // closed while opening: stay down
     this.open_ = true;
     this.emitInfo();
-    if (!this.opts.stealth) {
-      this.sendAir(p.AIR_BEACON, 0, new Uint8Array());
-      this.beacon = setInterval(() => this.sendAir(p.AIR_BEACON, 0, new Uint8Array()), this.opts.beaconMs ?? 10_000);
-    }
+    if (!this.opts.stealth) this.startBeacon();
     this.lonely = setTimeout(() => {
-      if (this.peers.size) return;
+      if (this.heardPeer) return;
       h.onNotice?.({
         level: "warning",
         title: "No one else on this Wi-Fi yet",
@@ -75,7 +80,18 @@ export class LanNode {
     }, this.opts.noPeersMs ?? 20_000);
   }
 
-  /** A host frame from the app. Only messaging is accepted: a LAN link has no admin. */
+  /** Beacons follow the stealth setting while connected. */
+  setStealth(on: boolean): void {
+    this.opts.stealth = on;
+    if (!this.open_) return;
+    if (on) this.stopBeacon();
+    else if (!this.beacon) this.startBeacon();
+  }
+
+  /**
+   * A host frame from the app. Like a guest with full permission on a real node, it may send any
+   * air type; frames that configure or administer a node (config, kick, ban, reboot) are ignored.
+   */
   send(frame: Uint8Array): void {
     if (!this.open_) return;
     if (frame[0] === p.H_INFO_REQ) return this.emitInfo();
@@ -106,7 +122,7 @@ export class LanNode {
     const r = parseAirFrame(data, this.net.netId, this.net.key);
     if (!r.ok) return this.drop(r.reason);
     const f = r.frame;
-    if (f.origin !== this.chipId) this.peers.add(f.origin);
+    if (f.origin !== this.chipId) this.heardPeer = true;
     const verdict = this.filter.check(f);
     if (verdict !== "ok") return this.drop(verdict);
     this.handlers?.onEvent({ kind: "recv", airType: f.type, ttl: f.ttl, origin: f.origin, msgId: f.msgId, flags: f.flags, body: f.body });
@@ -133,10 +149,20 @@ export class LanNode {
     h.onClose(reason);
   }
 
+  private startBeacon() {
+    this.sendAir(p.AIR_BEACON, 0, new Uint8Array());
+    this.beacon = setInterval(() => this.sendAir(p.AIR_BEACON, 0, new Uint8Array()), this.opts.beaconMs ?? 10_000);
+  }
+
+  private stopBeacon() {
+    if (this.beacon) clearInterval(this.beacon);
+    this.beacon = null;
+  }
+
   private stop() {
     this.open_ = false;
-    if (this.beacon) clearInterval(this.beacon);
+    this.stopBeacon();
     if (this.lonely) clearTimeout(this.lonely);
-    this.beacon = this.lonely = null;
+    this.lonely = null;
   }
 }
