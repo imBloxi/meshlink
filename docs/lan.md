@@ -17,7 +17,7 @@ Everyone on the same Wi-Fi can see that MeshLink is running, how often you send,
 | Symptom | Likely cause |
 |---|---|
 | "Connect to your home Wi-Fi or Ethernet first." | The PC has no private IPv4 address on a real adapter. |
-| "Port 4211 is in use" | Another program uses the port. Close it, or a second copy of MeshLink. |
+| "Could not listen on port 4211" / "Port 4211 is in use" | Another program uses the port, often a second copy of MeshLink. Windows also reports this when its firewall blocks MeshLink: allow it on Private networks. |
 | "No one else on this Wi-Fi yet" | The other app is not in Home Wi-Fi mode, uses a different MeshLink network, or the router blocks it. |
 | Works over Ethernet, not Wi-Fi | The router isolates Wi-Fi clients (called AP isolation or client isolation). Guest networks do this by default. |
 | Works only one way | Windows Firewall. Allow MeshLink on **Private** networks, and make sure Windows calls this network Private, not Public. |

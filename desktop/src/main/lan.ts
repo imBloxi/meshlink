@@ -82,7 +82,8 @@ export class UdpLan {
         sock.close();
         reject(new Error(
           e.code === "EADDRINUSE" ? `Port ${this.port} is in use by another program.`
-            : e.code === "EACCES" ? `Windows would not let MeshLink listen on port ${this.port}. Allow it in the firewall for Private networks.`
+            // Windows reports a port that another program holds as EACCES, the same code as a firewall block.
+            : e.code === "EACCES" ? `Could not listen on port ${this.port}. It is in use by another program (or a second copy of MeshLink), or Windows is blocking MeshLink. Close the other program and allow MeshLink for Private networks in the firewall.`
               : `Could not listen on the home network: ${e.message}`,
         ));
       });

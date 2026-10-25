@@ -110,7 +110,7 @@ describe("UdpLan", () => {
     const blocker = createSocket("udp4");
     await new Promise<void>((r) => blocker.bind(PORT_A, "0.0.0.0", r));
     try {
-      await expect(lan(PORT_A, PORT_B).open(() => {}, () => {})).rejects.toThrow(/4211|in use/i);
+      await expect(lan(PORT_A, PORT_B).open(() => {}, () => {})).rejects.toThrow(/port 47311.*in use/i); // EADDRINUSE on Linux, EACCES on Windows
     } finally {
       blocker.close();
     }
