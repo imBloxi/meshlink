@@ -6,6 +6,7 @@ import {
   app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, shell, Tray, type IpcMainEvent, type IpcMainInvokeEvent,
 } from "electron";
 import type { FirmwareManifest, MessageState, RecordKind, StoredContact, StoredMessage, UsbBridge } from "../shared/api";
+import { UdpLan } from "./lan";
 import { showSplash } from "./splash";
 import { Store } from "./store";
 import * as updates from "./updates";
@@ -36,6 +37,12 @@ let tray: Tray | null = null;
 let closeToTray = false;
 let quitting = false;
 const usb = new UsbWatcher((devices) => mainWindow?.webContents.send("usb:devices", devices));
+let lan: UdpLan | null = null; // home Wi-Fi transport; only exists while the user is connected to it
+
+function closeLan() {
+  lan?.close();
+  lan = null;
+}
 
 function createWindow(opts: { splash?: ReturnType<typeof showSplash>; hidden?: boolean } = {}) {
   const win = new BrowserWindow({
@@ -70,7 +77,14 @@ function createWindow(opts: { splash?: ReturnType<typeof showSplash>; hidden?: b
   win.once("ready-to-show", reveal);
   win.webContents.once("did-fail-load", reveal);
   setTimeout(reveal, 15_000);
-  win.on("closed", () => (mainWindow = null));
+  win.on("closed", () => {
+    mainWindow = null;
+    closeLan();
+  });
+  // A reload loses the renderer's link, so the socket has no one to talk to.
+  win.webContents.on("did-start-navigation", (_e, _url, _inPlace, isMainFrame) => {
+    if (isMainFrame) closeLan();
+  });
   // Keep running in the tray so messages keep arriving.
   win.on("close", (e) => {
     if (closeToTray && !quitting) {
@@ -179,6 +193,29 @@ function registerIpc() {
   handle("wifi:connect", (_e, ssid: string, psk: string, hidden: boolean) => wifi.connect(ssid, psk, hidden));
   handle("wifi:restore", () => wifi.restore());
   handle("nodes:discover", (_e, ms: number) => wifi.discover(Math.min(ms, 5000)));
+  handle("lan:open", async () => {
+    closeLan();
+    const session = new UdpLan();
+    lan = session;
+    try {
+      await session.open(
+        (d) => mainWindow?.webContents.send("lan:datagram", d),
+        (reason) => {
+          if (lan === session) lan = null;
+          mainWindow?.webContents.send("lan:closed", reason);
+        },
+      );
+      return { ok: true };
+    } catch (e) {
+      if (lan === session) lan = null;
+      return { ok: false, message: e instanceof Error ? e.message : String(e) };
+    }
+  });
+  on("lan:send", (_e, d: unknown) => {
+    // Air frames are at most 250 bytes. Anything else is not ours to broadcast.
+    if (d instanceof Uint8Array && d.length <= 250) lan?.send(d);
+  });
+  on("lan:close", closeLan);
   handle("file:save", async (_e, name: string, text: string) => {
     const r = await dialog.showSaveDialog(mainWindow!, {
       defaultPath: name, filters: [{ name: "MeshLink backup", extensions: ["meshlink"] }],
@@ -272,5 +309,6 @@ app.on("web-contents-created", (_e, contents) => {
 app.on("before-quit", () => (quitting = true));
 app.on("window-all-closed", () => {
   usb.stop();
+  closeLan();
   wifi.restore().finally(() => app.quit());
 });

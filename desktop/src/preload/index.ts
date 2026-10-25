@@ -26,6 +26,19 @@ const api: MeshlinkApi = {
   wifiConnect: (ssid, psk, hidden) => ipcRenderer.invoke("wifi:connect", ssid, psk, hidden),
   wifiRestore: () => ipcRenderer.invoke("wifi:restore"),
   discoverNodes: (ms) => ipcRenderer.invoke("nodes:discover", ms),
+  lanOpen: () => ipcRenderer.invoke("lan:open"),
+  lanSend: (datagram) => ipcRenderer.send("lan:send", datagram),
+  lanClose: () => ipcRenderer.send("lan:close"),
+  onLanDatagram: (cb) => {
+    const handler = (_e: unknown, datagram: Uint8Array) => cb(datagram);
+    ipcRenderer.on("lan:datagram", handler);
+    return () => ipcRenderer.off("lan:datagram", handler);
+  },
+  onLanClosed: (cb) => {
+    const handler = (_e: unknown, reason: string) => cb(reason);
+    ipcRenderer.on("lan:closed", handler);
+    return () => ipcRenderer.off("lan:closed", handler);
+  },
   saveTextFile: (name, text) => ipcRenderer.invoke("file:save", name, text),
   openTextFile: () => ipcRenderer.invoke("file:open"),
   openLocationSettings: () => ipcRenderer.invoke("app:openLocationSettings"),

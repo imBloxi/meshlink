@@ -6,7 +6,6 @@ import nacl from "tweetnacl";
 import { concat, readU32, u32le } from "./bytes";
 import { AIR_HEADER_LEN, MAX_AIR, MAX_BODY, TAG_LEN, VERSION } from "./protocol";
 
-export const LAN_PORT = 4211;
 const MAGIC = 0x4d;
 const TTL_AT = 3;
 

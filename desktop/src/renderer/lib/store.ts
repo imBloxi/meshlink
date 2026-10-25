@@ -11,7 +11,7 @@ import * as p from "@core/protocol";
 import { privateRoom, publicRoom, roomFromInvite, roomIdBytes, roomKey, type Room } from "@core/rooms";
 import type { FirmwareManifest, KnownNode, MessageState, StoredContact, StoredMessage, UsbBridge, UsbDevice } from "@shared/api";
 import { create } from "zustand";
-import { requestPortByName, usbBridgeName, WebSerialLink, WebSocketLink, type Link } from "./links";
+import { LanLink, requestPortByName, usbBridgeName, WebSerialLink, WebSocketLink, type Link } from "./links";
 import { api } from "./platform";
 
 export type Accent = "teal" | "blue" | "violet" | "amber" | "rose" | "lime";
@@ -38,6 +38,7 @@ export interface Settings {
   launchAtLogin: boolean;
   checkUpdates: boolean; // ask GitHub for a newer release on start (off by default: no network calls)
   activeNetId: number; // network new nodes are put on
+  lanIntro: boolean; // the home Wi-Fi privacy note has been shown
   disappear: Record<string, number>; // DM conversation -> seconds
 }
 
@@ -63,6 +64,7 @@ export const defaultSettings: Settings = {
   launchAtLogin: false,
   checkUpdates: false,
   activeNetId: 0,
+  lanIntro: false,
   disappear: {},
 };
 
@@ -137,6 +139,8 @@ interface State {
   disconnect(): Promise<void>;
   connectCom(com: string, auto?: boolean): Promise<void>;
   connectWifi(node: KnownNode, opts?: { viaLan?: string; quiet?: boolean }): Promise<boolean>;
+  /** Message other MeshLink apps over the home router, on the active network. No node needed. */
+  connectLan(): Promise<boolean>;
   autoConnectWifi(): Promise<void>;
   sendText(text: string): void;
   retry(uid: string): void;
@@ -688,12 +692,13 @@ export const useApp = create<State>((set, get) => {
       try {
         await next.open({
           onEvent,
+          onNotice: (n) => get().toast(n),
           onClose: (reason) => {
             link = null;
             messenger = null;
             scheduleAnnounce();
             set({ conn: { status: "disconnected", error: reason } });
-            get().toast({ level: "warning", title: "Node disconnected", body: reason });
+            get().toast({ level: "warning", title: next.kind === "lan" ? "Home Wi-Fi disconnected" : "Node disconnected", body: reason });
             scheduleWifi(3000);
           },
         });
@@ -701,7 +706,7 @@ export const useApp = create<State>((set, get) => {
         link = null;
         messenger = null;
         set({ conn: { status: "disconnected", error: String(e) } });
-        if (!opts?.quiet) get().toast({ level: "error", title: "Could not open node", body: e instanceof Error ? e.message : String(e) });
+        if (!opts?.quiet) get().toast({ level: "error", title: next.kind === "lan" ? "Could not use Home Wi-Fi" : "Could not open node", body: e instanceof Error ? e.message : String(e) });
         return false;
       }
       setTimeout(() => {
@@ -733,6 +738,11 @@ export const useApp = create<State>((set, get) => {
       scheduleAnnounce();
       if (l) await l.close();
       set({ conn: { status: "disconnected" } });
+    },
+
+    async connectLan() {
+      const n = get().networks[netKey(get().settings.activeNetId)] ?? OPEN_NETWORK;
+      return get().connect(new LanLink({ netId: n.netId, key: fromB64(n.key) }, { stealth: get().settings.stealth }));
     },
 
     async connectCom(com, auto = false) {
