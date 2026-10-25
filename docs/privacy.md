@@ -59,6 +59,7 @@ Limit: the fingerprint is 64 bits. Compare safety numbers in person for contacts
 - Guests log in with a **per-network pseudonym**: `seed = BLAKE2b-256("ml-guest-v1" | netId | account secret)`. It is the same on every visit, cannot be linked to your account fingerprint, and differs between networks.
 - Only a USB-connected node can be an admin. The app ignores admin claims from Wi-Fi nodes.
 - Node Wi-Fi profiles, with their passwords, are deleted from Windows when the app leaves the node.
+- **Home Wi-Fi mode** (Connect → Home Wi-Fi) is off until you choose it. While it is on, the app broadcasts MeshLink frames on your router's subnet, so everyone on that Wi-Fi can see that MeshLink runs, how often you send, the IP address of each PC, and your announces (display name and public keys, as on the radio). Messages stay end-to-end encrypted and are tagged with your network key. The app tries to skip VPN and virtual adapters by their names (a VPN with an ordinary name is not detected), uses a random id for each session, and sends no beacons in stealth mode. Your stable public keys in the announces still link you across sessions. See [lan.md](lan.md).
 
 ## 7. What stays on your computer
 
@@ -85,6 +86,7 @@ Also encrypted on Android: NodeLink keeps its account snapshot behind an Android
 Read these before you rely on it.
 
 - **That you use MeshLink, and when.** Radio traffic is visible. A listener sees when frames are sent, how many, and which node sent each first (the chip id is in the header). Frames of one room share a 4-byte tag per key epoch, so they can be grouped.
+- **Your presence on a home network.** In Home Wi-Fi mode, anyone on the same router can see that you use MeshLink, when you send and how many frames. Do not use it on a Wi-Fi you do not trust.
 - **Your announces.** Your display name and public keys are broadcast in clear so others can find you. Stealth mode stops automatic announces.
 - **Forward secrecy.** Keys are static. Someone who steals your key later can decrypt traffic they recorded earlier.
 - **A compromised PC.** Malware running as your Windows user can use your keys through DPAPI.

@@ -138,6 +138,16 @@ export interface MeshlinkApi {
   wifiRestore(): Promise<void>;
   /** Find nodes on the local network (UDP broadcast, port 4210). */
   discoverNodes(timeoutMs: number): Promise<DiscoveredNode[]>;
+  /**
+   * Home Wi-Fi transport: air-frame datagrams over UDP on the local subnet.
+   * One session at a time: opening again closes the previous session without telling it.
+   * Opening fails with a message the user can act on.
+   */
+  lanOpen(): Promise<{ ok: true } | { ok: false; message: string }>;
+  lanSend(datagram: Uint8Array): void;
+  lanClose(): void;
+  onLanDatagram(cb: (datagram: Uint8Array) => void): () => void;
+  onLanClosed(cb: (reason: string) => void): () => void;
   /** File dialogs for backups. */
   saveTextFile(defaultName: string, text: string): Promise<boolean>;
   openTextFile(): Promise<string | null>;

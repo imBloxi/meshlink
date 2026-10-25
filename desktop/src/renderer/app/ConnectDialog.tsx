@@ -1,12 +1,41 @@
 import { Dialog } from "@ui/overlays";
 import { Badge, Button, Input } from "@ui/primitives";
 import type { DiscoveredNode, KnownNode, WifiNetwork } from "@shared/api";
-import { CircleAlert, LoaderCircle, MapPin, Radio, RefreshCw, Unplug, Usb, Wifi, Zap } from "lucide-react";
+import { CircleAlert, House, LoaderCircle, MapPin, Radio, RefreshCw, Unplug, Usb, Wifi, Zap } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { api } from "../lib/platform";
 import { SimLink, usbBridgeName, WebSerialLink } from "../lib/links";
 import { useApp } from "../lib/store";
 import { ChoiceCard, PortList, useSerialPicker } from "./PortPicker";
+
+/** What the home Wi-Fi transport shows the LAN, said before the first use. */
+function LanPane({ onDone, onBack }: { onDone: () => void; onBack: () => void }) {
+  const { networks, settings, connectLan, updateSetting } = useApp();
+  const net = networks[String(settings.activeNetId >>> 0)];
+  const go = async () => {
+    updateSetting("lanIntro", true);
+    onDone();
+    await connectLan();
+  };
+  return (
+    <div className="space-y-4 text-sm">
+      <p>
+        Message other MeshLink apps on this router. No boards needed. Everyone must use the same network
+        {net ? <> (<strong>{net.name}</strong>)</> : <> (the open network)</>}.
+      </p>
+      <ul className="list-disc pl-5 space-y-1 text-muted">
+        <li>Messages stay end-to-end encrypted, as on the radio.</li>
+        <li>Everyone on this Wi-Fi can see that MeshLink is running, how often you send, and your announced name and public keys. Stealth mode stops beacons and automatic announces.</li>
+        <li>It works only on one home network. Guest Wi-Fi and some routers block it.</li>
+        <li>Windows may ask to allow MeshLink through the firewall. Allow it for Private networks.</li>
+      </ul>
+      <div className="flex gap-2">
+        <Button onClick={go}>Connect</Button>
+        <Button variant="ghost" onClick={onBack}>Back</Button>
+      </div>
+    </div>
+  );
+}
 
 function WifiPane({ onDone }: { onDone: () => void }) {
   const { knownNodes, connectWifi, wifiBusy } = useApp();
@@ -101,13 +130,23 @@ export function ConnectDialog() {
   const { ports, cancel, choose } = useSerialPicker(open);
   const [error, setError] = useState<string | null>(null);
   const [wifi, setWifi] = useState(false);
+  const [lanPane, setLanPane] = useState(false);
+  const { settings, connectLan } = useApp();
   const serialSupported = "serial" in navigator;
 
   const close = () => {
     cancel();
     setError(null);
     setWifi(false);
+    setLanPane(false);
     setPanel("connect", false);
+  };
+
+  // The privacy note comes first, once. After that it is one click.
+  const useLan = async () => {
+    if (!settings.lanIntro) return setLanPane(true);
+    setPanel("connect", false);
+    await connectLan();
   };
 
   const pickUsb = async () => {
@@ -137,11 +176,13 @@ export function ConnectDialog() {
     <Dialog
       open={open}
       onOpenChange={(o) => (o ? setPanel("connect", true) : close())}
-      title={ports ? "Choose a port" : "Connect a node"}
-      description={ports ? "Pick the COM port of your MeshLink ESP8266." : "The app talks to the mesh through a MeshLink node."}
+      title={ports ? "Choose a port" : lanPane ? "Home Wi-Fi" : "Connect a node"}
+      description={ports ? "Pick the COM port of your MeshLink ESP8266." : lanPane ? "Message other MeshLink apps on your router. No node needed." : "The app talks to the mesh through a MeshLink node."}
     >
       {ports ? (
         <PortList ports={ports} onChoose={choose} onBack={cancel} />
+      ) : lanPane ? (
+        <LanPane onDone={close} onBack={() => setLanPane(false)} />
       ) : wifi ? (
         <div className="space-y-4">
           <WifiPane onDone={close} />
@@ -174,6 +215,16 @@ export function ConnectDialog() {
             onClick={() => setWifi(true)}
             disabled={api.platform !== "electron"}
           />
+          {settings.experimentalLan && (
+            <ChoiceCard
+              icon={<House />}
+              title="Home Wi-Fi"
+              text={api.platform === "electron" ? "Message other MeshLink apps on your router. No boards." : "Needs the desktop app"}
+              badge={<Badge>Experimental</Badge>}
+              onClick={useLan}
+              disabled={api.platform !== "electron"}
+            />
+          )}
           <ChoiceCard
             icon={<Zap />}
             title="Flash a new board"

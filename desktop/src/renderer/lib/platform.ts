@@ -57,6 +57,11 @@ function webFallback(): MeshlinkApi {
     wifiConnect: async () => ({ ok: false, message: "Wi-Fi control needs the desktop app." }),
     wifiRestore: async () => {},
     discoverNodes: async () => [],
+    lanOpen: async () => ({ ok: false, message: "Home Wi-Fi needs the desktop app." }),
+    lanSend: () => {},
+    lanClose: () => {},
+    onLanDatagram: () => () => {},
+    onLanClosed: () => () => {},
     saveTextFile: async (name, text) => {
       const a = document.createElement("a");
       a.href = URL.createObjectURL(new Blob([text], { type: "application/json" }));

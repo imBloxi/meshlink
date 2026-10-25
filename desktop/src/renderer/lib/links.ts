@@ -2,16 +2,19 @@
 // (see PROTOCOL.md) and reports parsed NodeEvents.
 import { u32le } from "@core/bytes";
 import { encodeFrame, FrameReader } from "@core/framing";
+import { LanNode, type LanNetwork, type LanNotice, type LanTransport } from "@core/lannode";
 import * as p from "@core/protocol";
 import { api } from "./platform";
 
 export interface LinkHandlers {
   onEvent: (ev: p.NodeEvent) => void;
   onClose: (reason: string) => void;
+  /** Something the user should hear about that is not a node event. */
+  onNotice?: (notice: LanNotice) => void;
 }
 
 export interface Link {
-  readonly kind: "usb" | "wifi" | "sim";
+  readonly kind: "usb" | "wifi" | "sim" | "lan";
   readonly label: string;
   open(h: LinkHandlers): Promise<void>;
   send(frame: Uint8Array): Promise<void>;
@@ -208,6 +211,63 @@ export class SimLink implements Link {
     if (this.beacon) clearInterval(this.beacon);
     this.ch?.close();
     this.ch = null;
+  }
+}
+
+// ---- Home Wi-Fi: other MeshLink apps on the same router act as the mesh ----
+
+/** The UDP socket lives in the Electron main process; this is its renderer end. */
+class IpcLanTransport implements LanTransport {
+  private off: (() => void)[] = [];
+
+  async open(onDatagram: (d: Uint8Array) => void, onClosed: (reason: string) => void) {
+    this.off = [api.onLanDatagram(onDatagram), api.onLanClosed(onClosed)];
+    const r = await api.lanOpen();
+    if (!r.ok) {
+      this.detach();
+      throw new Error(r.message);
+    }
+  }
+
+  send(d: Uint8Array) {
+    api.lanSend(d);
+  }
+
+  close() {
+    this.detach();
+    api.lanClose();
+  }
+
+  private detach() {
+    for (const f of this.off) f();
+    this.off = [];
+  }
+}
+
+export class LanLink implements Link {
+  readonly kind = "lan";
+  readonly label = "Home Wi-Fi";
+  private node: LanNode;
+
+  constructor(net: LanNetwork, opts: { stealth: boolean }) {
+    this.node = new LanNode(new IpcLanTransport(), net, { stealth: opts.stealth });
+  }
+
+  open(h: LinkHandlers) {
+    return this.node.open(h);
+  }
+
+  /** Stealth changed while connected: start or stop beacons at once. */
+  setStealth(on: boolean) {
+    this.node.setStealth(on);
+  }
+
+  async send(frame: Uint8Array) {
+    this.node.send(frame);
+  }
+
+  async close() {
+    this.node.close();
   }
 }
 

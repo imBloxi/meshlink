@@ -4,7 +4,7 @@ import type { Room } from "@core/rooms";
 import { Identicon, TrustBadge } from "@ui/identity";
 import { Badge, Button, cn, IconButton, Input, Kbd, StatusDot, Tooltip } from "@ui/primitives";
 import {
-  Crown, Globe, Hash, KeyRound, Lock, Megaphone, Network, Plus, Radio, Search, Settings, ShieldHalf, Usb, Wifi,
+  Crown, Globe, Hash, House, KeyRound, Lock, Megaphone, Network, Plus, Radio, Search, Settings, ShieldHalf, Usb, Wifi,
 } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
 import { assessFirmware, wantsUpdate } from "@core/firmware";
@@ -28,7 +28,7 @@ function ConnectionPill() {
   const label = on
     ? conn.nodeName || `Node ${conn.chipId?.toString(16).toUpperCase().slice(-4) ?? ""}`
     : conn.status === "connecting" ? "Connecting…" : wifiBusy ?? "Not connected";
-  const icon = conn.kind === "sim" ? <Radio /> : conn.kind === "wifi" ? <Wifi /> : <Usb />;
+  const icon = conn.kind === "sim" ? <Radio /> : conn.kind === "wifi" ? <Wifi /> : conn.kind === "lan" ? <House /> : <Usb />;
   const sub = on
     ? `${network ? network.name : `Network ${netIdHex(conn.netId ?? 0)}`} · ${neighbors} ${neighbors === 1 ? "node" : "nodes"} near`
     : needsDriver ? "Board found: USB driver missing"
