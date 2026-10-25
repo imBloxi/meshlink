@@ -1,6 +1,6 @@
 # MeshLink Protocol v3
 
-This document describes what MeshLink sends on the radio, over USB and over Wi-Fi. The code is the reference: `firmware/src/protocol.h`, `desktop/src/core/protocol.ts` and `desktop/src/core/payloads.ts`.
+This document describes what MeshLink sends on the radio, over USB, over a node's Wi-Fi and over a home router (app to app). The code is the reference: `firmware/src/protocol.h`, `desktop/src/core/protocol.ts` and `desktop/src/core/payloads.ts`.
 
 MeshLink has three layers. Each layer trusts only what it can check.
 
@@ -120,6 +120,21 @@ With `lanGuests` off (the default), the node serves guests, UDP discovery, its w
 ### 2.5 Discovery
 
 UDP port 4210. Request `"MLDISCOVER"`. Answer `"MLNODE" chipId(4) netId(4) nameLen(1) name`. Same address rule as guests.
+
+### 2.6 Home Wi-Fi (app to app, no node)
+
+Apps on the same home network can exchange air frames directly, with no node. The app acts as a guest-only node toward itself: it builds and checks the same air frames as section 1 and hands the same `RECV`, `SENT` and `INFO` events to the rest of the app.
+
+- **Transport.** One UDP datagram on port **4211** carries one air frame (`header 17 + body ≤ 225 + tag 8`). Port 4210 stays reserved for node discovery.
+- **Addressing.** The app sends to the directed broadcast address of each private IPv4 adapter (for example `192.168.1.255`). It skips adapters that look like a VPN, a virtual switch or a container, so MeshLink does not announce itself into those networks. It listens on all adapters and accepts only RFC1918 source addresses.
+- **Tag.** The same keyed tag as on the radio, `BLAKE2s-64(key = netKey, frame without tag, ttl = 0)`, with the network chosen in the app (`netId 0` is the open network with an all-zero key).
+- **TTL.** Senders write `ttl = 0`. Nothing relays on a LAN, because one broadcast reaches every app. The tag excludes the TTL, so a node that later bridges the LAN to ESP-NOW can set its own.
+- **Receive rules**, in the order of section 1: wrong size, magic, version or a zero `msgId` is dropped; another `netId` is dropped (apps never relay); a bad tag is dropped **before** any state changes; then own frames (the socket hears its own broadcast), duplicates (last 512 `msgId`s) and origins over 10 frames per second.
+- **Identity on the wire.** `origin` is a random 32-bit id picked for each session, so a PC cannot be followed across restarts. `ANNOUNCE` frames still carry the display name and public keys in clear (section 4.2), so everyone on the LAN can read them unless stealth mode is on.
+- **Presence.** A `BEACON` every 10 seconds, none in stealth mode. The app warns after 20 seconds without hearing anyone.
+- **Permission.** A LAN link has no admin: it sends only `SEND` and `INFO_REQ`. Nothing is sent or bound until the user chooses **Connect → Home Wi-Fi**.
+
+The code is `desktop/src/core/lanframe.ts`, `lanpeer.ts`, `lannode.ts` and `desktop/src/main/lan.ts`. `lanframe.test.ts` holds a tag vector produced by the firmware's own BLAKE2s.
 
 ## 3. Padding
 

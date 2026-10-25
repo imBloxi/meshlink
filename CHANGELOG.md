@@ -6,6 +6,10 @@ The desktop app and the node firmware share one version number. The app shows al
 
 ## [Unreleased]
 
+### Added
+- **Home Wi-Fi mode.** Choose **Connect → Home Wi-Fi** to message other MeshLink apps on the same router, with no boards. It sends the radio's air frames over UDP port 4211 with the same keyed network tag, on the network you picked in the app. It is off until you choose it, sends no beacons in stealth mode, skips VPN and virtual adapters, and uses a random id for each session. Desktop only for now. See [docs/lan.md](docs/lan.md) and PROTOCOL.md section 2.6.
+- The air protocol (v3) and the firmware are unchanged. A future node can bridge the LAN to the radio without translating frames.
+
 ## [0.5.1] - 2026-10-24
 
 ### Fixed

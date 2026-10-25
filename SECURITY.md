@@ -57,6 +57,7 @@ Only the latest release gets security fixes. MeshLink is pre-1.0, and the protoc
 - **Metadata on disk.** The database file still shows how many messages you have, their timestamps and delivery state, and how many contacts and rooms.
 - **Names in announces.** Your display name and public key are broadcast in clear so others can find you. Stealth mode stops automatic announces.
 - **Forward secrecy.** Keys are static. If someone steals your key later, they can decrypt messages they recorded earlier.
+- **Home Wi-Fi mode.** Frames are broadcast on the local subnet. Everyone on that Wi-Fi sees that MeshLink is running, when and how much you send, and the session id of each sender. A router that allows client isolation blocks the mode. On the open network anyone on the LAN can inject frames, as on the radio. The app skips VPN and virtual adapters.
 - **The open network (netId 0).** Its network key is all zeros, so anyone can inject frames into it. Use your own network for real use.
 - **First contact (trust on first use).** A new contact is unverified until you compare the safety number in person.
 - **A compromised PC.** Malware running as your Windows user can read your keys through DPAPI.

@@ -55,7 +55,7 @@ Connect each board to a PC running MeshLink. The apps find each other and appear
 
 **Before you trust a contact, compare the safety number in person** (Contact → Verify). Anyone in radio range can pick any name.
 
-**No boards yet?** Choose **Connect → Simulator** in two app windows.
+**No boards yet?** Choose **Connect → Home Wi-Fi** to message other MeshLink apps on your router, or **Connect → Simulator** in two app windows.
 
 ## How it works
 
@@ -72,6 +72,7 @@ flowchart LR
 | App to app | Encrypts and signs every message | NaCl box / secretbox (X25519, XSalsa20-Poly1305), Ed25519 |
 | Node to node | Floods frames over ESP-NOW, drops duplicates, rate-limits | Keyed BLAKE2s tag with the network key |
 | App to node | USB serial (admin) or the node's Wi-Fi hotspot (guest) | Guest login with a per-network key |
+| App to app (no node) | Your home router, as UDP broadcast on one subnet | Same keyed tag as the radio, per network |
 
 The full wire format is in [PROTOCOL.md](PROTOCOL.md).
 
@@ -90,6 +91,7 @@ MeshLink makes no network calls unless you ask, and it keeps as little as possib
 | Internet | No update checks or other requests unless you turn them on. |
 | Your Wi-Fi | The app never switches it to a node's hotspot unless you allow it. |
 | Nodes on your home network | Silent: guests and discovery work only on the node's own hotspot. |
+| Home Wi-Fi mode | Off until you choose it. Then everyone on that Wi-Fi can see MeshLink is running. |
 
 The radio itself can't be hidden: someone with a receiver can see when MeshLink frames are sent, and which node sent them. [SECURITY.md](SECURITY.md) lists what MeshLink does not protect.
 

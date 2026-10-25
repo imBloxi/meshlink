@@ -22,7 +22,7 @@ Out: Android, a node that bridges ESP-NOW and the LAN, using the LAN next to a U
 | `LanFilter` | `core/lanpeer.ts` | Duplicate filter (last 512 msgIds), per-origin rate limit, own-echo drop. Pure. |
 | `LanNode` | `core/lannode.ts` | Node emulation over an injected `LanTransport`. Beacons, `info`, `recv`, `sent`. Pure, testable. |
 | `lan.ts` | `main/lan.ts` | UDP socket on port 4211, interface scan, IPC. |
-| `LanLink` | `renderer/lib/links.ts` | Thin `Link` adapter: `LanNode` over the IPC transport. |
+| `LanLink` | `renderer/lib/links.ts` | Thin `Link` adapter: `LanNode` over an IPC transport (`lanOpen`, `lanSend`, `lanClose`, `onLanDatagram`, `onLanClosed`). `LinkHandlers` gained an optional `onNotice` for the no-peers warning. |
 | UI | `ConnectDialog.tsx` | "Home Wi-Fi" tile with a first-use explainer. |
 
 ### Wire format
@@ -33,7 +33,7 @@ One UDP datagram carries one air frame, exactly as in PROTOCOL.md section 1: `he
 - The sender writes `ttl = 0`. The tag excludes TTL, so a future bridge can set its own.
 - No relaying. One broadcast reaches the whole LAN.
 - Network: the active network (`settings.activeNetId`). The open network has an all-zero key; content stays end-to-end encrypted.
-- Send target: the directed broadcast address of each private IPv4 interface, never `255.255.255.255` (wrong adapter on Windows with VPN, WSL or Hyper-V).
+- Send target: the directed broadcast address of each private IPv4 interface, never `255.255.255.255` (wrong adapter on Windows with VPN, WSL or Hyper-V). Adapters whose names look like a VPN, TAP/TUN, WireGuard, Tailscale, ZeroTier, Hyper-V/WSL/vEthernet, Docker, VMware, VirtualBox or Bluetooth are skipped, because a corporate VPN often has a 10.x address and would otherwise see MeshLink presence. This was added during implementation.
 - Receive: only RFC1918 source addresses.
 - Receive order, as on a node: size, magic, version, duplicate check against the tag-verified set only after the tag passes. Foreign `netId` is dropped (apps never relay). A forged frame cannot fill the duplicate set or use up an origin's rate budget.
 - Per-origin rate limit: 10 frames/s, the firmware default (`originRate`).
@@ -43,7 +43,7 @@ One UDP datagram carries one air frame, exactly as in PROTOCOL.md section 1: `he
 - Opt-in: nothing is sent or bound until the user connects. Startup auto-connect never picks `lan`.
 - `chipId` is random per session, so a PC cannot be tracked across restarts.
 - `BEACON` every 10 s, none in stealth mode.
-- First-use text: everyone on this Wi-Fi can see that MeshLink runs and how often you send; messages stay encrypted.
+- First-use text: everyone on this Wi-Fi can see that MeshLink runs, how often you send and your announced name (stealth hides announces); messages stay encrypted. Shown once (`lanIntro` setting).
 
 ### Errors
 
