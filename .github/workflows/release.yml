@@ -64,7 +64,7 @@ jobs:
           awk -v v="$v" '$0 ~ "^## \\[" v "\\]" {on=1; next} /^## \[/ {on=0} on' CHANGELOG.md > notes.md
           printf '\n---\nVerify downloads with `SHA256SUMS.txt`. The installer is not code-signed yet, so Windows SmartScreen may warn: choose "More info" and then "Run anyway".\n' >> notes.md
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           draft: true
           name: MeshLink ${{ github.ref_name }}
