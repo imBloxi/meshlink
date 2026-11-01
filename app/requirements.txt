@@ -1,2 +1,2 @@
 pyserial>=3.5
-pynacl>=1.5
+pynacl>=1.6.2
