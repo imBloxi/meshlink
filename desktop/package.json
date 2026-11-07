@@ -36,29 +36,29 @@
     "@radix-ui/react-tooltip": "^1.4.1",
     "@scure/bip39": "^2.4.0",
     "clsx": "^2.1.1",
-    "esptool-js": "^0.7.0",
-    "lucide-react": "^1.61.0",
+    "esptool-js": "^0.7.1",
+    "lucide-react": "^1.68.0",
     "qrcode": "^1.5.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "tweetnacl": "^1.0.3",
-    "zustand": "^5.0.15"
+    "zustand": "^5.0.16"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.3.3",
-    "@types/node": "^26.6.5",
+    "@tailwindcss/vite": "^4.3.4",
+    "@types/node": "^26.6.6",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "@types/w3c-web-serial": "^1.0.8",
+    "@types/w3c-web-serial": "^1.0.9",
     "@vitejs/plugin-react": "^5.2.0",
-    "electron": "^45.0.0",
+    "electron": "^45.2.2",
     "electron-builder": "^26.18.0",
     "electron-vite": "^6.0.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vite": "^7.3.7",
-    "vitest": "^5.0.5"
+    "vitest": "^5.1.0"
   },
   "productName": "MeshLink",
   "build": {
